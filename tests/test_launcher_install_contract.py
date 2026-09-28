@@ -132,12 +132,14 @@ def test_run_bat_names_the_fix_instead_of_a_traceback(tmp_path):
         # exercise the .env loader branch on machines without one
         env_file.write_text("# comment line\nO2S_SMOKE_VAR=1\n", encoding="utf-8")
         made_env = True
+    before = set(p.name for p in ROOT.iterdir())
     try:
         proc = _run_launcher_with_missing_module(
             ["cmd", "/c", str(ROOT / "run.bat")], tmp_path)
     finally:
         if made_env:
             env_file.unlink()
+    created = sorted(set(p.name for p in ROOT.iterdir()) - before)
     out = proc.stdout + proc.stderr
     assert "syntax of the command is incorrect" not in out.lower(), out
     assert proc.returncode != 0, out
@@ -145,10 +147,34 @@ def test_run_bat_names_the_fix_instead_of_a_traceback(tmp_path):
     # The FIRST line must print whole. Inside a parenthesised block cmd can
     # drop a caret escape, so "-^> SSRS" became a REDIRECTION: the line was
     # cut at the arrow and an empty file named "SSRS" appeared in the repo
-    # root on every run (measured). No arrow, no stray file.
+    # root on every run (measured). No arrow, no stray file. Judged on what
+    # THIS launch created (before/after), so a file left by some other test
+    # is never blamed on run.bat -- conftest's repo-root tripwire names that
+    # test instead.
     assert "a required Python package is not installed" in out, out
-    assert not (ROOT / "SSRS").exists(), \
-        "run.bat created a stray file: an echo line is being parsed as a redirection"
+    assert not created, \
+        f"run.bat created {created}: an echo line is being parsed as a redirection"
+
+
+def test_launcher_line_endings_are_what_each_interpreter_requires():
+    """run.bat must be CRLF and pure ASCII; run.sh must be LF.
+
+    MEASURED, not theoretical: with LF-only endings, cmd.exe re-read run.bat
+    from a wrong offset after an external command and executed the TAIL of
+    its own header comment ("-> SSRS Converter ...") -- creating a stray
+    empty file named SSRS in the repo root during a full test run. The same
+    comment block carries a pip install command; a mis-resumed launcher could
+    run it on a machine where the launcher promises it never installs.
+    .gitattributes pins both endings for every checkout."""
+    bat = (ROOT / "run.bat").read_bytes()
+    assert bat.count(b"\n") == bat.count(b"\r\n"), \
+        "run.bat has LF-only line endings -- cmd.exe can resume mid-line"
+    assert all(b < 128 for b in bat), "run.bat must be pure ASCII (cmd reads it in the OEM code page)"
+    sh = (ROOT / "run.sh").read_bytes()
+    assert b"\r\n" not in sh, "run.sh has CRLF line endings -- bash reads the CR as part of each command"
+    attrs = (ROOT / ".gitattributes").read_text(encoding="utf-8")
+    assert re.search(r"^\*\.bat\s+text\s+eol=crlf\s*$", attrs, re.M), ".gitattributes must pin *.bat to CRLF"
+    assert re.search(r"^\*\.sh\s+text\s+eol=lf\s*$", attrs, re.M), ".gitattributes must pin *.sh to LF"
 
 
 def test_run_bat_echo_lines_carry_no_redirection_characters():

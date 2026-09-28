@@ -36,10 +36,11 @@
 
 5. **Tab 3 — Bursting.** "If the source report had per-recipient
    distribution — one PDF per customer, per facility, per district
-   — we detect it automatically. Here's the burst key field we derived,
-   the filename pattern, the recipient query, and a PowerShell DDS
-   emulator script for SSRS Standard installations. Everything zips up
-   as a downloadable Burst Pack."
+   — we detect it automatically. Here's the burst key we derived and the
+   file-name pattern. The Burst Pack gives you the report with a hidden
+   per-key filter parameter, a key-list report, and a zero-install
+   PowerShell driver that renders one file per key through the report
+   server — on any SSRS edition. You can dry-run it from your own PC."
 
 6. **Tab 4 — Sub-Reports.** "If the parent report drills through to
    child reports, this tab lights up. Upload the child's Oracle XML

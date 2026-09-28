@@ -77,7 +77,7 @@ machine.
 | **Validation** | The full pre-flight audit behind the verdict banner; every finding says what happens at run time and what to do. | Triage before deployment. BLOCKER = won't work, RED = wrong output, AMBER = check, READY = deploy. |
 | **Deployment** | The go-live checklist: shared data source, upload steps, why you skip Refresh Fields, download buttons. | Every deployment, until it's muscle memory. |
 | **Extras** | Fidelity scorecard (nothing silently lost), conversion audit trail, copy-paste AI prompts. | Deep dives and second opinions. |
-| **Bursting** | Per-recipient split + email distribution wiring (SSRS subscriptions) — the SSRS-native replacement for Oracle's `distribute=YES`. | Letter/invoice runs that go out to many recipients. |
+| **Bursting** | One rendered file per key (Oracle `distribute=YES`): the Burst Pack — filtered RDL + key-list RDL + `Run-Burst.ps1` driver — replaces Oracle distribution on any SSRS edition. | Letter/invoice/permit runs that produce one file per record. |
 | **Sub-reports** | Auto-detected child reports (envelopes, detail pages) with a dropzone to convert each through the same pipeline. | Reports whose rows drill through to another report. |
 
 Advanced views are hidden behind **Show advanced views** until you need
@@ -234,9 +234,16 @@ fidelity scores, effort tiers). The community tier processes batches of
   link; the child is built through the full pipeline (RDL + mockup) with
   the parent's forwarded parameters declared and hidden, and the drilled
   key NULL-guard-filtered so a standalone run still returns rows.
-- **Bursting:** per-recipient distribution instructions are detected and
-  summarized in the Bursting pane; pure distribution specs (a
-  `<destinations>` file) are classified honestly rather than converted.
+- **Bursting:** per-key distribution instructions are detected and the
+  Bursting pane builds a **Burst Pack** zip: the report with a hidden
+  `P_O2S_BURST_KEY` filter parameter, a `<Report>_BurstList.rdl` key-list
+  report, `Run-Burst.ps1` (Windows PowerShell 5.1 built-ins only, renders
+  one file per key through SSRS URL access), `burst.config.json`, a README
+  and the service-account checklist. Upload BOTH `.rdl` files to one folder,
+  fill the config, run `Run-Burst.ps1 -DryRun` from your own PC, then
+  `-TestLimit 2`, then schedule it under a service account. Pure
+  distribution specs (a `<destinations>` file) are classified honestly
+  rather than converted.
 
 ---
 

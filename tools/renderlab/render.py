@@ -152,7 +152,7 @@ def expression_host_available() -> bool:
 
 
 def _render_via_ps1(rdl_path: Path, out_pdf: Path, rows: int,
-                    timeout: int) -> dict:
+                    timeout: int, fmt: str = "PDF") -> dict:
     """Render through the SIGNED ReportViewer DLLs via render_rdl.ps1, which has
     no expression host: staticize the RDL (=expr -> placeholder) first so the
     engine never JIT-compiles an expression. Used when RenderLab.exe is missing
@@ -169,7 +169,8 @@ def _render_via_ps1(rdl_path: Path, out_pdf: Path, rows: int,
         proc = subprocess.run(
             ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
              "-File", str(PS1), "-RdlPath", str(srdl), "-DataJson", str(djs),
-             "-OutPdf", str(out_pdf), "-LibDir", str(LIB)],
+             "-OutPdf", str(out_pdf), "-LibDir", str(LIB),
+             "-Format", fmt],
             capture_output=True, text=True, timeout=timeout,
         )
     log = (proc.stdout or "") + (proc.stderr or "")
@@ -179,7 +180,7 @@ def _render_via_ps1(rdl_path: Path, out_pdf: Path, rows: int,
 
 
 def render_rdl(rdl_path: str | Path, out_pdf: str | Path,
-               rows: int = 3, timeout: int = 240) -> dict:
+               rows: int = 3, timeout: int = 240, fmt: str = "PDF") -> dict:
     """Render an RDL to PDF. Prefers RenderLab.exe (the LocalReport host that
     evaluates LIVE =expressions — highest fidelity); if that exe is missing or
     blocked by an Application Control policy, falls back to the signed-DLL
@@ -191,6 +192,8 @@ def render_rdl(rdl_path: str | Path, out_pdf: str | Path,
         return {"ok": False, "pdf": None, "mode": None,
                 "log": "ReportViewer DLLs missing — run fetch_reportviewer.py"}
     rdl_xml = rdl_path.read_text(encoding="utf-8")
+    if fmt.upper() != "PDF":
+        return _render_via_ps1(rdl_path, out_pdf, rows, timeout, fmt=fmt)
     if ensure_exe():
         spec = synthesize_data(rdl_xml, rows=rows)
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False,

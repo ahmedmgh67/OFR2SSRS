@@ -1,0 +1,15 @@
+# Line endings that the INTERPRETER requires, fixed per file type so every
+# checkout gets them regardless of each person's core.autocrlf setting.
+#
+# Windows batch files MUST be CRLF. cmd.exe re-reads a batch file from a
+# saved offset after each external command; with LF-only endings that offset
+# lands mid-line and cmd executes fragments of later lines -- including REM
+# comment text. Measured here: run.bat (then LF) resumed inside its own
+# header comment and executed "-> SSRS ...", creating a stray file named SSRS.
+# The same comment block carries a pip command, which a mis-resumed launcher
+# could RUN -- on machines where the launcher promises it never installs.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Shell scripts MUST be LF: bash reads a CR as part of each command.
+*.sh text eol=lf

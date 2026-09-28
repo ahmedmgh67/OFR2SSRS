@@ -26,7 +26,7 @@ from .audit import build_audit_trail
 from .fidelity import build_fidelity_report
 from .fidelity import ATTENTION_THRESHOLD as _FIDELITY_ATTENTION
 from .ai_assist import build_prompts
-from .bursting import detect_bursting, build_burst_query, build_powershell_dds_script, build_email_burst_query, build_email_powershell_script, build_service_account_checklist, build_email_config_template
+from .bursting import detect_bursting
 from .subreports import detect_subreport_links, is_drillthrough_only
 
 
@@ -326,6 +326,37 @@ def convert(xml_bytes: bytes, target_db: str = "oracle",
     except Exception as e:  # noqa: BLE001
         conversion_error = f"RDL generation: {type(e).__name__}: {e}"
         rdl_xml = _fallback_rdl(parsed, conversion_error)
+
+    # Bursting (Oracle distribution) is decided HERE, before any audit,
+    # because a bursting report's RDL gains one hidden parameter and one
+    # dataset filter (burst_pack.inject_burst_key_filter) -- the per-key
+    # switch the Burst Pack driver sets. Injecting first means every rail
+    # below (preflight, publish, no-prompt, bind contract) judges the RDL
+    # that is actually downloaded. The SQL is never touched.
+    bursting_info = {"is_bursting": False}
+    _burst_meta = {}
+    if conversion_error is None:
+        try:
+            bursting_info = detect_bursting(parsed)
+            # A drill-through-only report (hyperlink to a child report,
+            # no distribution markers) is NOT bursting -- it is a sub-report
+            # link. Suppress the flag so the user gets the Sub-Reports tab.
+            if bursting_info.get("is_bursting") and is_drillthrough_only(parsed):
+                bursting_info = {
+                    "is_bursting": False,
+                    "evidence": bursting_info.get("evidence", []) + [
+                        "reclassified as drill-through (hyperlink to child report, no distribution markers)",
+                    ],
+                    "reclassified_as": "drillthrough",
+                }
+            if bursting_info.get("is_bursting"):
+                from .burst_pack import inject_burst_key_filter
+                rdl_xml, _burst_meta = inject_burst_key_filter(rdl_xml, bursting_info)
+                bursting_info["bind_parameter"] = _burst_meta.get("bind_parameter")
+                bursting_info["filter_injected"] = bool(_burst_meta.get("injected"))
+                bursting_info["filter_reason"] = _burst_meta.get("reason", "")
+        except Exception as e:  # noqa: BLE001 -- never sink a convert
+            bursting_info = {"is_bursting": False, "error": f"{type(e).__name__}: {e}"}
     # Declared tokens that resolved to nothing renderable. Captured HERE,
     # immediately after the build that produced them, because later passes
     # (mockup, sub-report) resolve against the same report object. Skipped
@@ -400,34 +431,28 @@ def convert(xml_bytes: bytes, target_db: str = "oracle",
     except Exception as e:  # noqa: BLE001
         subreport_links = []
 
-    # Bursting / DDS detection
-    bursting_info = {"is_bursting": False}
+    # Bursting artifacts for the UI (detection + the RDL injection already
+    # happened right after generation, see above).
     try:
-        bursting_info = detect_bursting(parsed)
-        # Override: if the report is drill-through-only (hyperlink to a
-        # child report) WITHOUT any per-row email/distribution markers,
-        # it is NOT bursting -- it's just a sub-report link. Suppress
-        # the bursting flag so the user gets the Sub-Reports tab
-        # instead of the (irrelevant) Bursting tab content.
-        if bursting_info.get("is_bursting") and is_drillthrough_only(parsed):
-            bursting_info = {
-                "is_bursting": False,
-                "evidence": bursting_info.get("evidence", []) + [
-                    "reclassified as drill-through (hyperlink to child report, no distribution markers)",
-                ],
-                "reclassified_as": "drillthrough",
-            }
         if bursting_info.get("is_bursting"):
-            bursting_info["burst_query"] = build_burst_query(parsed, bursting_info)
-            bursting_info["email_burst_query"] = build_email_burst_query(parsed, bursting_info)
-            bursting_info["email_powershell_script"] = build_email_powershell_script(parsed, bursting_info, f"{parsed.name or 'report'}.rdl")
-            bursting_info["service_account_checklist"] = build_service_account_checklist(parsed, bursting_info)
-            bursting_info["email_config_template"] = build_email_config_template(parsed, bursting_info)
-            bursting_info["powershell_script"] = build_powershell_dds_script(
-                parsed, bursting_info, f"{parsed.name or 'report'}.rdl"
-            )
+            from .burst_pack import prepare as _prepare_burst_pack
+            try:
+                setattr(parsed, "_o2s_rdl_xml", rdl_xml)
+            except Exception:  # noqa: BLE001
+                pass
+            _pack = _prepare_burst_pack(parsed.name or "report", rdl_xml, bursting_info)
+            bursting_info["burst_query"] = _pack["burst_list_sql"]
+            bursting_info["email_burst_query"] = _pack["burst_list_sql"]
+            bursting_info["burst_list_rdl"] = _pack["burst_list_rdl"] or ""
+            bursting_info["burst_list_columns"] = _pack["columns"]
+            bursting_info["filename_pattern_normalized"] = _pack["meta"].get("pattern")
+            bursting_info["powershell_script"] = _pack["driver"]
+            bursting_info["email_powershell_script"] = _pack["driver"]
+            bursting_info["email_config_template"] = _pack["config_json"]
+            bursting_info["service_account_checklist"] = _pack["checklist"]
+            bursting_info["readme"] = _pack["readme"]
     except Exception as e:  # noqa: BLE001
-        bursting_info = {"is_bursting": False, "error": f"{type(e).__name__}: {e}"}
+        bursting_info["artifact_error"] = f"{type(e).__name__}: {e}"
 
     preflight = preflight_audit(rdl_xml, target_db=target_db)
     # PUBLISH-TIME SEMANTICS. The rules Report Server enforces when it

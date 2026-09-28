@@ -109,3 +109,55 @@ def translated_report(parsed_report):
 @pytest.fixture(scope="session")
 def samples_dir():
     return ROOT / "samples" / "oracle"
+
+
+# ---------------------------------------------------------------------------
+# Repo-root tripwire: no test may leave a stray file in the repository root.
+#
+# A full run left an empty file named "SSRS" in the repo root -- the
+# signature of a shell redirect ("... -> SSRS") executed by something the
+# suite runs. It never reproduced with any single test file run alone, so it
+# is an interaction, and hunting it by hand across ~4,000 tests is hopeless.
+# This fixture makes the suite name the culprit itself: it snapshots the root
+# before each test and FAILS the test that leaves a new, non-ignored entry
+# behind. A stray file is not harmless -- `git add -A` publishes it.
+# ---------------------------------------------------------------------------
+
+import os as _os
+import subprocess as _subprocess
+
+
+def _root_entries():
+    try:
+        return set(_os.listdir(ROOT))
+    except OSError:
+        return set()
+
+
+def _git_ignored(names):
+    """Names git would ignore (tool caches, local outputs) are not strays."""
+    if not names:
+        return set()
+    try:
+        res = _subprocess.run(["git", "check-ignore", "--", *sorted(names)],
+                              cwd=ROOT, capture_output=True, text=True,
+                              timeout=30)
+    except Exception:  # noqa: BLE001 -- no git: judge every new name
+        return set()
+    return {ln.strip() for ln in res.stdout.splitlines() if ln.strip()}
+
+
+@pytest.fixture(autouse=True)
+def _no_stray_files_in_repo_root(request):
+    before = _root_entries()
+    yield
+    new = _root_entries() - before
+    if not new:
+        return
+    stray = sorted(new - _git_ignored(new))
+    if stray:
+        pytest.fail(
+            f"{request.node.nodeid} left new file(s) in the repository root: "
+            f"{stray}. Tests must write under tmp_path, never the repo root "
+            f"(a stray file is one `git add -A` away from being published).",
+            pytrace=False)

@@ -210,25 +210,30 @@ MIME: `text/html`.
 
 ## `POST /api/burst-preview`
 
-Returns a preview of the per-recipient burst recipient query (the T-SQL
-that would be embedded in an SSRS Data-Driven Subscription).
+Re-generates the Burst Pack files for the last-converted report with the
+Distribution Settings the UI sends (every key is a `burst.config.json`
+key; `report_server_url` is split into `ReportServer` + folder paths).
 
 **Request** (`application/json`)
 
 ```json
-{ "limit": 50 }
+{ "config_overrides": { "Deliver": "file", "OutputRoot": "C:\\Burst\\out",
+                       "report_server_url": "http://host/ReportServer?/Folder" } }
 ```
 
 **Response 200**
 
 ```json
 {
-  "burst_key_field": "Burst_Key",
-  "filename_pattern": "<Burst_Key>.pdf",
-  "recipient_sql":    "SELECT ... AS Burst_Key, ... AS Email ...",
-  "rows":             [["KEY-001", "alice@example.com"], ...],
-  "columns":          ["Burst_Key", "Email"],
-  "warnings":         ["..."]
+  "bind_parameter":            "P_O2S_BURST_KEY",
+  "filter_injected":           true,
+  "filename_pattern_normalized": "<Permit>_{date:yyyyMMdd}.pdf",
+  "powershell_script":         "<Run-Burst.ps1>",
+  "email_config_template":     "<burst.config.json>",
+  "burst_list_rdl":            "<the key-list RDL>",
+  "burst_list_sql":            "SELECT DISTINCT ... AS BURST_KEY ...",
+  "readme":                    "...",
+  "service_account_checklist": [{ "step": 1, "title": "...", "body": "..." }]
 }
 ```
 
@@ -236,8 +241,10 @@ that would be embedded in an SSRS Data-Driven Subscription).
 
 ## `POST /api/download/burst-pack`
 
-Streams the Burst Pack `.zip` (recipient SQL + PowerShell DDS-emulator
-script + README) for the current conversion.
+Streams the Burst Pack `.zip` for the current conversion: `<Report>.rdl`
+(with the hidden `P_O2S_BURST_KEY` filter parameter), `<Report>_BurstList.rdl`,
+`Run-Burst.ps1`, `burst.config.json`, `README.md`, `service-account-setup.md`.
+Takes the same `config_overrides` body as `/api/burst-preview`.
 
 MIME: `application/zip`.
 

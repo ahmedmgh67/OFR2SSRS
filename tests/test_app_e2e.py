@@ -186,19 +186,42 @@ def test_bursting_detected_and_pack_generates(client):
     assert z.status_code == 200, z.get_data(as_text=True)[:400]
     zf = zipfile.ZipFile(io.BytesIO(z.data))
     names = set(zf.namelist())
-    assert "Send-Reports.ps1" in names
+    assert "Run-Burst.ps1" in names
     assert "burst.config.json" in names
     assert "README.md" in names
     assert "service-account-setup.md" in names
-    rdl_names = [n for n in names if n.endswith(".rdl")]
-    assert rdl_names, "burst pack missing the .rdl"
-    rdl = zf.read(rdl_names[0]).decode("utf-8")
-    # The packed RDL inherits the session's data source binding + invariant.
-    assert "<DataSourceReference>/DS/Oracle</DataSourceReference>" in rdl
-    _assert_no_prompt_params(rdl, "burst pack rdl")
-    ps = zf.read("Send-Reports.ps1").decode("utf-8", "replace")
-    assert "__BURST_SQL__" not in ps, "PS template placeholder not substituted"
+    assert "SAMPLE_BURST.rdl" in names
+    assert "SAMPLE_BURST_BurstList.rdl" in names, "the key-list report is part of the pack"
+    for rdl_name in ("SAMPLE_BURST.rdl", "SAMPLE_BURST_BurstList.rdl"):
+        rdl = zf.read(rdl_name).decode("utf-8")
+        # Every packed RDL inherits the session's data source binding + invariant.
+        assert "<DataSourceReference>/DS/Oracle</DataSourceReference>" in rdl, rdl_name
+        _assert_no_prompt_params(rdl, "burst pack " + rdl_name)
+    main = zf.read("SAMPLE_BURST.rdl").decode("utf-8")
+    assert '<ReportParameter Name="P_O2S_BURST_KEY">' in main, "the per-key filter parameter"
+    ps = zf.read("Run-Burst.ps1").decode("utf-8-sig")
+    assert "__BIND_PARAM__" not in ps, "PS template placeholder not substituted"
     assert "__REPORT_NAME__" not in ps, "PS template placeholder not substituted"
+    assert "P_O2S_BURST_KEY" in ps
+
+
+def test_bundle_download_ships_the_burst_pack_bound_to_the_session_data_source(client):
+    """The full bundle used to crash (NameError) for every bursting report,
+    and its key-list report was a convert-time snapshot without the
+    session's data-source binding."""
+    j = _convert(client, _BURSTING_XML, {"shared_ds_path": "/DS/Oracle"})
+    assert j["bursting"].get("is_bursting") is True
+    r = client.get("/api/download/bundle")
+    assert r.status_code == 200, r.get_data(as_text=True)[:300]
+    zf = zipfile.ZipFile(io.BytesIO(r.data))
+    names = set(zf.namelist())
+    for n in ("bursting/Run-Burst.ps1", "bursting/burst.config.json",
+              "bursting/burst_key_list.sql", "bursting/SAMPLE_BURST_BurstList.rdl"):
+        assert n in names, sorted(names)
+    lst = zf.read("bursting/SAMPLE_BURST_BurstList.rdl").decode("utf-8")
+    assert "<DataSourceReference>/DS/Oracle</DataSourceReference>" in lst
+    assert zf.read("bursting/Run-Burst.ps1").startswith(b"\xef\xbb\xbf")
+    _assert_no_prompt_params(lst, "bundle burst list rdl")
 
 
 def test_oracle_xml_subreport_declares_forwarded_drillthrough_params():

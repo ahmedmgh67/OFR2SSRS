@@ -116,9 +116,10 @@ Every conversion surfaces **four main tabs**:
 - **RDL XML** — syntax-highlighted, structurally valid SSRS RDL. Download it
   and upload straight to your Report Server.
 - **Bursting** — automatic detection of Oracle distribution patterns
-  (per-recipient PDF output, email blast keys, file-path templates) with a
-  downloadable **Burst Pack** containing the recipient query, parameter
-  mapping, and a PowerShell DDS-emulator script for SSRS Standard.
+  (one output file per record, file-name templates, mail destinations) with
+  a downloadable **Burst Pack**: the report with a hidden per-key filter
+  parameter, a key-list report, and a zero-install PowerShell driver that
+  renders one file per key through SSRS URL access on any edition.
 - **Sub-Reports** — when the parser detects drill-through child reports, this
   tab lets you upload the child Oracle XML/SQL/DOCX and generates an RDL for
   each child.
@@ -221,11 +222,23 @@ blocks.
 
 ### Bursting
 
-Oracle distribution patterns (per-recipient PDF output, email blast keys,
-file-path templates) are detected and packaged into a downloadable **Burst
-Pack**: the recipient query, the parameter mapping, and a PowerShell
-DDS-emulator script that reproduces Data-Driven Subscription behavior on SSRS
-Standard.
+Oracle *distribution* (one output file per permit / invoice / recipient,
+written from one run) is detected from the source's own distribution
+declarations and reproduced by a downloadable **Burst Pack**:
+
+- the report's RDL gains ONE hidden parameter (`P_O2S_BURST_KEY`) and ONE
+  dataset filter -- set it and the report shows that key; leave it empty and
+  the report is exactly the one you would deploy anyway (SQL untouched);
+- a companion `<Report>_BurstList.rdl` groups the same dataset by the key,
+  so the report server itself produces the key list (rendered as CSV);
+- `Run-Burst.ps1` renders the report once per key through SSRS URL access
+  and saves each file under the Oracle file name (or emails it). Windows
+  PowerShell 5.1 built-ins only -- nothing is installed on any server, and
+  it can be tried from a desk PC with `-DryRun` / `-TestLimit 2` before a
+  service account and Task Scheduler take over.
+
+SSRS Enterprise's native Data-Driven Subscriptions remain the alternative;
+the pack's README gives the key-list SQL to paste into one.
 
 ### Batch migration + Migration Assessment
 

@@ -1,0 +1,446 @@
+<#
+=============================================================================
+__REPORT_NAME__ -- Burst driver (one rendered file per key)
+=============================================================================
+
+WHAT THIS DOES
+  Oracle Reports "distribution" ran the report once and wrote one output
+  file per record (one PDF per permit, per invoice, ...). SSRS has no
+  built-in equivalent below Enterprise edition, so this script does the
+  loop instead:
+
+    1. Ask the report server for the KEY LIST: it renders the companion
+       report <Report>_BurstList as CSV -- one row per key, produced by
+       the report's own query on the report server's own data source.
+       Nothing is installed here and no database driver is needed.
+    2. For every key, ask the report server to render the main report
+       with the hidden parameter __BIND_PARAM__ set to that key
+       (the report filters its rows to that one key).
+    3. Save the rendered file under the name the Oracle report used
+       (FileNamePattern), and optionally email it.
+
+  Everything here is built into Windows PowerShell 5.1: Invoke-WebRequest,
+  ConvertFrom-Csv, Send-MailMessage. No modules. Authentication is the
+  Windows identity this script runs as (your own account when testing,
+  the service account under Task Scheduler).
+
+HOW TO TEST FROM YOUR OWN PC (no server access needed)
+  powershell -ExecutionPolicy Bypass -File .\Run-Burst.ps1 -DryRun
+      -> lists the keys and the file names, renders nothing
+  powershell -ExecutionPolicy Bypass -File .\Run-Burst.ps1 -TestLimit 2
+      -> renders only the first two keys into OutputRoot (not recorded
+         in the history, so the real run still produces them)
+  powershell -ExecutionPolicy Bypass -File .\Run-Burst.ps1 -Key 12345
+      -> renders that one key, history ignored
+
+FILES
+  burst.config.json                    sibling file; every setting lives there
+  %ProgramData%\Oracle2SSRS\<Report>\  run log (one JSON line per event) and
+                                       done_keys_<yyyyMMdd>.txt: keys produced
+                                       TODAY. A rerun the same day resumes
+                                       where it stopped; a run on another day
+                                       produces everything again. -Force
+                                       redoes today's keys too. "History" in
+                                       the config: day (default) | forever |
+                                       none. "LogRoot" moves the folder.
+
+EXIT CODES
+  0 = ran (see run_complete in the log)   1 = every key failed / aborted
+  2 = configuration error
+=============================================================================
+#>
+#requires -Version 5.1
+[CmdletBinding()]
+param(
+    [string]$ConfigPath = (Join-Path $PSScriptRoot 'burst.config.json'),
+    [switch]$DryRun,
+    [int]$TestLimit = 0,
+    [string]$Key = '',
+    [switch]$Force
+)
+
+$ErrorActionPreference = 'Stop'
+function Stop-Run {
+    # Print a message on stderr and exit with a specific code. (Write-Error
+    # under ErrorActionPreference=Stop would terminate with code 1 first.)
+    param([string]$Message, [int]$Code)
+    $host.UI.WriteErrorLine($Message)
+    exit $Code
+}
+# TLS 1.2 for https report servers (PS 5.1 defaults to older protocols).
+try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
+
+# -----------------------------------------------------------------------------
+# Config
+# -----------------------------------------------------------------------------
+if (-not (Test-Path -LiteralPath $ConfigPath)) {
+    Stop-Run "Config not found: $ConfigPath" 2
+}
+$cfg = $null
+try {
+    $cfg = Get-Content -LiteralPath $ConfigPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+} catch {
+    Stop-Run ("burst.config.json is not valid JSON: " + $_.Exception.Message) 2
+}
+if ($null -eq $cfg) { Stop-Run "burst.config.json is empty" 2 }
+
+function Get-Setting {
+    param([string]$Name, $Default = $null)
+    $v = $cfg.PSObject.Properties[$Name]
+    if ($null -eq $v -or $null -eq $v.Value -or "$($v.Value)" -eq '') { return $Default }
+    return $v.Value
+}
+
+function ConvertTo-Bool {
+    # JSON true/false, or the words people type by hand ("false", "no", "0").
+    # ([bool]'false' is $true in PowerShell -- measured.)
+    param($Value, [bool]$Default)
+    if ($null -eq $Value) { return $Default }
+    if ($Value -is [bool]) { return $Value }
+    $s = ("" + $Value).Trim().ToLowerInvariant()
+    if ($s -eq '') { return $Default }
+    if (@('true', '1', 'yes', 'y', 'on') -contains $s) { return $true }
+    if (@('false', '0', 'no', 'n', 'off') -contains $s) { return $false }
+    return $Default
+}
+
+$ReportName      = Get-Setting 'ReportName' '__REPORT_NAME__'
+$ReportServer    = ("" + (Get-Setting 'ReportServer' '')).TrimEnd('/', '?')
+$ReportPath      = Get-Setting 'ReportPath' ''
+$BurstListPath   = Get-Setting 'BurstListPath' ''
+$BindParameter   = Get-Setting 'BindParameter' '__BIND_PARAM__'
+$KeyField        = "" + (Get-Setting 'KeyField' '')
+$Deliver         = ("" + (Get-Setting 'Deliver' 'file')).ToLowerInvariant()
+$OutputRoot      = Get-Setting 'OutputRoot' (Join-Path $PSScriptRoot 'out')
+$FileNamePattern = Get-Setting 'FileNamePattern' '<BURST_KEY>.pdf'
+$RenderFormat    = "" + (Get-Setting 'RenderFormat' 'PDF')
+$Overwrite       = ConvertTo-Bool (Get-Setting 'Overwrite' $null) $true
+$TimeoutSec      = [int](Get-Setting 'TimeoutSec' 600)
+$Retries         = [int](Get-Setting 'Retries' 3)
+$History         = ("" + (Get-Setting 'History' 'day')).ToLowerInvariant()
+$AbortAfter      = [int](Get-Setting 'AbortAfterFailures' 5)
+$TestRedirect    = "" + (Get-Setting 'TestRedirect' '')
+if ($TestLimit -le 0) { $TestLimit = [int](Get-Setting 'TestLimit' 0) }
+$ReportParams    = Get-Setting 'ReportParameters' $null
+
+$missing = @()
+foreach ($k in 'ReportServer', 'ReportPath', 'BurstListPath') {
+    if (-not (Get-Setting $k '')) { $missing += $k }
+}
+if ($missing.Count -gt 0) {
+    Stop-Run ("burst.config.json is missing: " + ($missing -join ', ') + ". (An empty BurstListPath means the pack shipped without a key-list report; see README.md.)") 2
+}
+if ($ReportServer -match '/Reports(/|$)') {
+    Write-Warning "ReportServer looks like the web PORTAL (.../Reports). This script needs the SERVICE endpoint, usually http://host/ReportServer"
+}
+if (@('file', 'email', 'both') -notcontains $Deliver) {
+    Stop-Run "Deliver must be file, email or both (got '$Deliver')" 2
+}
+
+# -----------------------------------------------------------------------------
+# Logging: one JSON line per event, plus a readable console line.
+# History: the keys produced TODAY (History=day), ever (forever), or none.
+# -----------------------------------------------------------------------------
+$LogRoot = Get-Setting 'LogRoot' (Join-Path $env:ProgramData ('Oracle2SSRS\' + ($ReportName -replace '[\\/:*?"<>|]', '_')))
+New-Item -ItemType Directory -Force -Path $LogRoot | Out-Null
+$RunDay   = Get-Date -Format 'yyyyMMdd'
+$LogFile  = Join-Path $LogRoot ($RunDay + '.jsonl')
+if ($History -eq 'forever') {
+    $DoneFile = Join-Path $LogRoot 'done_keys.txt'
+} else {
+    $DoneFile = Join-Path $LogRoot ('done_keys_' + $RunDay + '.txt')
+}
+# A test run (-TestLimit, -Key, TestRedirect) is never recorded: the real
+# run must still produce those keys. -Force and -Key ignore the history.
+$RecordHistory = ($History -ne 'none') -and ($TestLimit -le 0) -and ($Key -eq '') -and ($TestRedirect -eq '')
+$UseHistory    = ($History -ne 'none') -and (-not $Force) -and ($Key -eq '')
+
+function Write-Event {
+    param([string]$Level, [string]$Event, [hashtable]$Extra = @{})
+    $rec = [ordered]@{ ts = (Get-Date).ToString('o'); level = $Level; event = $Event; report = $ReportName }
+    # PSBase.Keys: on a hashtable, "$h.Keys" returns the VALUE of an entry
+    # literally named "keys" instead of the key collection (measured).
+    $names = @($Extra.PSBase.Keys)
+    foreach ($k in $names) { $rec[[string]$k] = "$($Extra[$k])" }
+    ($rec | ConvertTo-Json -Compress) | Add-Content -LiteralPath $LogFile -Encoding UTF8
+    $detail = ($names | ForEach-Object { "$_=$($Extra[$_])" }) -join ' '
+    Write-Host ("[{0}] {1} {2}" -f $Level, $Event, $detail)
+}
+
+# -----------------------------------------------------------------------------
+# URL access helpers
+# -----------------------------------------------------------------------------
+function ConvertTo-ItemPathQuery {
+    # "/Folder A/Report" -> "/Folder%20A/Report" (each segment escaped; slashes kept)
+    param([string]$ItemPath)
+    $p = $ItemPath.Trim()
+    if (-not $p.StartsWith('/')) { $p = '/' + $p }
+    $parts = $p.TrimStart('/') -split '/' | ForEach-Object { [uri]::EscapeDataString($_) }
+    return '/' + ($parts -join '/')
+}
+
+function Get-ParamQuery {
+    # The report's own parameters from config (a name -> value object), URL-encoded.
+    # An empty value is not sent, so the report uses its own default.
+    param($Params)
+    $q = ''
+    if ($null -ne $Params) {
+        foreach ($prop in $Params.PSObject.Properties) {
+            if ($null -eq $prop.Value -or "$($prop.Value)" -eq '') { continue }
+            $q += '&' + [uri]::EscapeDataString($prop.Name) + '=' + [uri]::EscapeDataString("$($prop.Value)")
+        }
+    }
+    return $q
+}
+
+function Get-ServerMessage {
+    # Reporting Services answers URL-access failures with an HTML page that
+    # carries the real reason (rsItemNotFound, rsUnknownReportParameter ...).
+    param([string]$Body)
+    $t = $Body -replace '<[^>]+>', ' '
+    $t = ($t -replace '&nbsp;', ' ') -replace '\s+', ' '
+    $t = $t.Trim()
+    if ($t.Length -gt 300) { $t = $t.Substring(0, 300) + '...' }
+    return $t
+}
+
+function Invoke-Render {
+    # Render one item to a file through URL access. Retries transient
+    # failures (network, time-outs, 5xx, 408, 429); a 4xx is permanent
+    # (wrong path, unknown parameter, no permission) and fails at once.
+    param([string]$ItemPath, [string]$Format, [string]$ExtraQuery, [string]$OutFile)
+    $url = $ReportServer + '?' + (ConvertTo-ItemPathQuery $ItemPath) + '&rs:Command=Render&rs:Format=' + $Format + $ExtraQuery
+    $attempt = 0
+    while ($true) {
+        $attempt++
+        try {
+            Invoke-WebRequest -Uri $url -UseDefaultCredentials -UseBasicParsing -OutFile $OutFile -TimeoutSec $TimeoutSec -ErrorAction Stop | Out-Null
+            if (-not (Test-Path -LiteralPath $OutFile) -or (Get-Item -LiteralPath $OutFile).Length -eq 0) {
+                throw "the server returned an empty response"
+            }
+            return
+        } catch {
+            $status = 0
+            $detail = $_.Exception.Message
+            try {
+                $resp = $_.Exception.Response
+                if ($null -ne $resp) { $status = [int]$resp.StatusCode }
+            } catch { }
+            try {
+                if ($null -ne $_.ErrorDetails -and "$($_.ErrorDetails.Message)" -ne '') {
+                    $detail = $detail + ' | server: ' + (Get-ServerMessage "$($_.ErrorDetails.Message)")
+                }
+            } catch { }
+            $permanent = ($status -ge 400 -and $status -lt 500 -and $status -ne 408 -and $status -ne 429)
+            if ($permanent -or $attempt -ge $Retries) {
+                if ($status -gt 0) { throw ("HTTP " + $status + " from " + $ItemPath + ": " + $detail) }
+                throw ($ItemPath + ": " + $detail)
+            }
+            Start-Sleep -Seconds (5 * $attempt)
+        }
+    }
+}
+
+function Get-SafeFileName {
+    param([string]$Name)
+    $n = $Name -replace '[\\/:*?"<>|]', '_'
+    $n = ($n -replace '\s+', ' ').Trim().TrimEnd('.')
+    if ($n -eq '') { $n = 'output' }
+    # Windows device names (CON, NUL, COM1 ...) are not files, whatever the extension.
+    $stem = ($n -split '\.', 2)[0]
+    if ($stem -match '^(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$') { $n = '_' + $n }
+    return $n
+}
+
+$FormatExtension = @{
+    'PDF'          = '.pdf'
+    'EXCELOPENXML' = '.xlsx'
+    'EXCEL'        = '.xls'
+    'WORDOPENXML'  = '.docx'
+    'WORD'         = '.doc'
+    'CSV'          = '.csv'
+    'XML'          = '.xml'
+    'MHTML'        = '.mhtml'
+    'IMAGE'        = '.tif'
+}
+
+function Set-FileExtension {
+    # The file name always matches the bytes: Excel output is never saved as .pdf.
+    param([string]$Name, [string]$Format)
+    $ext = $FormatExtension[$Format.ToUpperInvariant()]
+    if (-not $ext) { return $Name }
+    $known = '(?i)\.(pdf|xlsx|xls|docx|doc|csv|xml|mhtml|tif|tiff)$'
+    if ($Name -match $known) { return ($Name -replace $known, $ext) }
+    return $Name + $ext
+}
+
+function Expand-FileName {
+    # <Column> tokens come from the key-list row (the key itself is the
+    # BURST_KEY column; the Oracle key column name is an alias for it), then
+    # from the report parameters; {date:yyyyMMdd} inserts today's date;
+    # anything unknown is left as typed.
+    param([string]$Pattern, $Row)
+    $name = $Pattern
+    $name = [regex]::Replace($name, '\{date:([^}]+)\}', { param($m) (Get-Date).ToString($m.Groups[1].Value) })
+    $name = [regex]::Replace($name, '<([^<>]+)>', {
+        param($m)
+        $tok = $m.Groups[1].Value.Trim()
+        $prop = $Row.PSObject.Properties | Where-Object { $_.Name -ieq $tok } | Select-Object -First 1
+        if ($null -ne $prop) { return "$($prop.Value)" }
+        if ($KeyField -ne '' -and $tok -ieq $KeyField) { return "$($Row.BURST_KEY)" }
+        if ($null -ne $ReportParams) {
+            $pp = $ReportParams.PSObject.Properties | Where-Object { $_.Name -ieq $tok } | Select-Object -First 1
+            if ($null -ne $pp) { return "$($pp.Value)" }
+        }
+        return $m.Value
+    })
+    return (Set-FileExtension (Get-SafeFileName $name) $RenderFormat)
+}
+
+# -----------------------------------------------------------------------------
+# 1. Key list
+# -----------------------------------------------------------------------------
+Write-Event 'INFO' 'run_start' @{ dry_run = $DryRun.IsPresent; test_limit = $TestLimit; deliver = $Deliver; history = $History; config = $ConfigPath }
+
+$listFile = Join-Path $env:TEMP ('o2s_burstlist_' + [guid]::NewGuid().ToString('N') + '.csv')
+try {
+    Invoke-Render -ItemPath $BurstListPath -Format 'CSV' -ExtraQuery ('&rc:Encoding=UTF-8' + (Get-ParamQuery $ReportParams)) -OutFile $listFile
+    $csvText = [System.IO.File]::ReadAllText($listFile, [System.Text.Encoding]::UTF8)
+} catch {
+    Write-Event 'ERROR' 'key_list_failed' @{ item = $BurstListPath; msg = $_.Exception.Message }
+    Stop-Run ("The key list could not be rendered: " + $_.Exception.Message) 1
+} finally {
+    Remove-Item -LiteralPath $listFile -Force -ErrorAction SilentlyContinue
+}
+$csvText = $csvText.TrimStart([char]0xFEFF)
+$rows = @()
+if ($csvText.Trim() -ne '') { $rows = @($csvText | ConvertFrom-Csv) }
+if ($rows.Count -gt 0 -and $null -eq ($rows[0].PSObject.Properties['BURST_KEY'])) {
+    Write-Event 'ERROR' 'key_list_shape' @{ columns = (($rows[0].PSObject.Properties | ForEach-Object { $_.Name }) -join ',') }
+    Stop-Run "The key list has no BURST_KEY column. Deploy the unmodified <Report>_BurstList.rdl from the Burst Pack." 1
+}
+if ($Key -ne '') { $rows = @($rows | Where-Object { "$($_.BURST_KEY)" -eq $Key }) }
+Write-Event 'INFO' 'key_list_loaded' @{ count = $rows.Count }
+if ($rows.Count -eq 0) {
+    Write-Event 'WARN' 'no_keys' @{}
+    exit 0
+}
+
+# The file-name pattern is validated once, up front: a typo in {date:...}
+# is a configuration error, not a per-key failure.
+try {
+    $null = Expand-FileName -Pattern $FileNamePattern -Row $rows[0]
+} catch {
+    Write-Event 'ERROR' 'config_invalid' @{ setting = 'FileNamePattern'; msg = $_.Exception.Message }
+    Stop-Run ("FileNamePattern is invalid: " + $_.Exception.Message) 2
+}
+
+$done = @{}
+if ($UseHistory -and (Test-Path -LiteralPath $DoneFile)) {
+    Get-Content -LiteralPath $DoneFile | Where-Object { $_ -ne '' } | ForEach-Object { $done[$_] = $true }
+}
+
+# -----------------------------------------------------------------------------
+# 2. Render per key
+# -----------------------------------------------------------------------------
+if ($Deliver -ne 'email' -and -not $DryRun) {
+    New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
+}
+$ok = 0; $fail = 0; $skip = 0; $n = 0; $consecutiveFail = 0; $aborted = $false
+$paramQuery = Get-ParamQuery $ReportParams
+
+foreach ($row in $rows) {
+    $key = "$($row.BURST_KEY)"
+    if ($key -eq '') { $skip++; Write-Event 'WARN' 'skip_empty_key' @{}; continue }
+    if ($done.ContainsKey($key)) { $skip++; Write-Event 'INFO' 'skip_done' @{ key = $key }; continue }
+    if ($TestLimit -gt 0 -and $n -ge $TestLimit) { break }
+    $n++
+
+    $fileName = Expand-FileName -Pattern $FileNamePattern -Row $row
+    $outFile  = Join-Path $OutputRoot $fileName
+
+    if ($DryRun) {
+        Write-Event 'INFO' 'dry_run' @{ key = $key; file = $outFile }
+        $ok++
+        continue
+    }
+
+    # Rendered into a private folder under the REAL file name, so an email
+    # attachment carries that name too.
+    $tmpDir = Join-Path $env:TEMP ('o2s_burst_' + [guid]::NewGuid().ToString('N'))
+    $tmp = Join-Path $tmpDir $fileName
+    try {
+        New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
+        $extra = '&' + [uri]::EscapeDataString($BindParameter) + '=' + [uri]::EscapeDataString($key) + $paramQuery
+        Invoke-Render -ItemPath $ReportPath -Format $RenderFormat -ExtraQuery $extra -OutFile $tmp
+
+        if ($Deliver -ne 'email') {
+            if ((Test-Path -LiteralPath $outFile) -and -not $Overwrite) {
+                Write-Event 'WARN' 'exists_kept' @{ key = $key; file = $outFile }
+            } else {
+                Copy-Item -LiteralPath $tmp -Destination $outFile -Force
+                Write-Event 'INFO' 'file_written' @{ key = $key; file = $outFile }
+            }
+        }
+
+        if ($Deliver -eq 'email' -or $Deliver -eq 'both') {
+            $toCol = Get-Setting 'EmailToColumn' 'EmailTo'
+            $toProp = $row.PSObject.Properties | Where-Object { $_.Name -ieq $toCol } | Select-Object -First 1
+            $to = if ($null -ne $toProp) { "$($toProp.Value)" } else { '' }
+            if ($TestRedirect -ne '') { $to = $TestRedirect }
+            if ($to -eq '') {
+                Write-Event 'WARN' 'skip_no_email' @{ key = $key }
+            } else {
+                # .Replace, not -replace: a key containing '$' must never act
+                # as a regex substitution pattern.
+                $subject = ("" + (Get-Setting 'Subject' '{ReportName} - {BurstKey}')).Replace('{ReportName}', $ReportName).Replace('{BurstKey}', $key)
+                $body    = ("" + (Get-Setting 'Body' 'Your {ReportName} for {BurstKey} is attached.')).Replace('{ReportName}', $ReportName).Replace('{BurstKey}', $key)
+                $mail = @{
+                    SmtpServer  = "" + (Get-Setting 'SmtpServer' '')
+                    Port        = [int](Get-Setting 'SmtpPort' 25)
+                    From        = "" + (Get-Setting 'SmtpFrom' '')
+                    To          = $to
+                    Subject     = $subject
+                    Body        = $body
+                    Attachments = $tmp
+                    ErrorAction = 'Stop'
+                }
+                if (ConvertTo-Bool (Get-Setting 'SmtpUseSsl' $null) $false) { $mail['UseSsl'] = $true }
+                $credFile = "" + (Get-Setting 'SmtpCredentialFile' '')
+                if ($credFile -ne '') { $mail['Credential'] = Import-Clixml -LiteralPath $credFile }
+                Send-MailMessage @mail
+                Write-Event 'INFO' 'email_sent' @{ key = $key; to = $to; file = $fileName }
+            }
+        }
+
+        $ok++
+        $consecutiveFail = 0
+        if ($RecordHistory) { Add-Content -LiteralPath $DoneFile -Value $key -Encoding UTF8 }
+    } catch {
+        $fail++
+        $consecutiveFail++
+        Write-Event 'ERROR' 'render_failed' @{ key = $key; msg = $_.Exception.Message }
+        if ($AbortAfter -gt 0 -and $consecutiveFail -ge $AbortAfter) {
+            $aborted = $true
+            Write-Event 'ERROR' 'run_aborted' @{ consecutive_failures = $consecutiveFail; msg = 'the same failure repeats; fix the cause and rerun (AbortAfterFailures in the config)' }
+        }
+    } finally {
+        Remove-Item -LiteralPath $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if ($aborted) { break }
+}
+
+# -----------------------------------------------------------------------------
+# 3. Summary
+# -----------------------------------------------------------------------------
+Write-Event 'INFO' 'run_complete' @{ key_count = $rows.Count; ok = $ok; failed = $fail; skipped = $skip; aborted = $aborted; dry_run = $DryRun.IsPresent }
+if ($rows.Count -gt 0 -and $ok -eq 0 -and $fail -eq 0 -and $skip -eq $rows.Count) {
+    Write-Event 'WARN' 'all_skipped' @{ hint = 'every key was already produced today (' + $DoneFile + '); -Force redoes them' }
+}
+if ($aborted) {
+    Stop-Run ("Run aborted after $consecutiveFail consecutive failures ($ok ok, $fail failed). See $LogFile") 1
+}
+if ($fail -gt 0 -and $ok -eq 0) {
+    Stop-Run "Every key failed ($fail). See $LogFile" 1
+}
+exit 0

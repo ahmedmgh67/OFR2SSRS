@@ -256,6 +256,15 @@ _allow(_SUB,
 _allow("backend/converter/ai_apply.py",
        ("DROP", "TRUNCATE", "EXEC", "EXECUTE", "xp_", "sp_executesql"),
        "SQL / T-SQL DDL + procedure keywords blocked by the injection guard.")
+_allow("backend/converter/burst_pack.py",
+       ("PDF", "EXCELOPENXML", "WORDOPENXML", "EXCEL", "WORD", "CSV", "XML", "MHTML", "IMAGE"),
+       "SSRS rendering-extension names (rs:Format values) - fixed by Reporting "
+       "Services; mapped to the file extension each format's bytes need.")
+_allow("backend/converter/burst_pack.py",
+       ("YYYY", "RRRR", "HH24", "MM", "DD", "HH", "MI", "SS"),
+       "Oracle TO_CHAR date-format-model elements - fixed by the Oracle SQL "
+       "dialect; a file-name piece made only of these is a run-date the "
+       "Burst Pack driver fills in ({date:...}).")
 _allow(_BURST,
        ("DUAL", "SYS", "INFORMATION_SCHEMA", "SELECT"),
        "Oracle / ANSI dictionary + keyword names excluded from table detection.")

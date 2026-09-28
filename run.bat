@@ -3,7 +3,7 @@ REM Oracle -> SSRS Converter launcher (Windows)
 REM
 REM NO INSTALLS. This script only STARTS the app. On locked-down machines
 REM an automatic `pip install` triggers install activity and PATH warnings
-REM the user may be unable to act on (work-machine verified) — dependency
+REM the user may be unable to act on (work-machine verified) -- dependency
 REM setup is never done implicitly. If a required package is missing, the
 REM app's own import error names it, and the ONE optional command is:
 REM     python -m pip install -r requirements.txt

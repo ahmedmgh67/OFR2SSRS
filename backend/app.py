@@ -1417,8 +1417,27 @@ def api_download_bundle():
     data = dict(data)
     data["rdl_xml"] = _apply_deploy_datasource(data["rdl_xml"], request)
     _reconcile_checklist(data)
-    blob = build_bundle_zip(data)
     name = (data.get("report") or {}).get("name") or "report"
+    # The bursting artifacts in the bundle are rebuilt from the BOUND RDL, so
+    # the key-list report beside the main .rdl carries the same data-source
+    # reference (a convert-time snapshot would not).
+    if (data.get("bursting") or {}).get("is_bursting"):
+        try:
+            from converter import burst_pack as _bp
+            _pack = _bp.prepare(name, data["rdl_xml"], data["bursting"],
+                                {"report_server_url": _REPORT_URL_STORE.get(_sid(), "")})
+            b = dict(data["bursting"])
+            b.update(burst_list_rdl=_pack["burst_list_rdl"] or "",
+                     powershell_script=_pack["driver"],
+                     email_powershell_script=_pack["driver"],
+                     email_config_template=_pack["config_json"],
+                     burst_query=_pack["burst_list_sql"],
+                     email_burst_query=_pack["burst_list_sql"],
+                     readme=_pack["readme"])
+            data["bursting"] = b
+        except Exception:  # noqa: BLE001 -- the bundle still ships
+            traceback.print_exc()
+    blob = build_bundle_zip(data)
     return send_file(
         io.BytesIO(blob),
         mimetype="application/zip",
@@ -1592,33 +1611,38 @@ def _last_parsed_report():
 
 @app.post("/api/burst-preview")
 def api_burst_preview():
-    """Re-render the bursting tab's 4 collapsible blocks using UI-form values."""
+    """Re-render the Bursting tab's generated files using UI-form values.
+
+    Everything comes from burst_pack.prepare on the SAME RDL the user
+    downloads (session data-source binding applied), so the preview IS the
+    pack. The sidebar's report-server URL prefills ReportServer/ReportPath."""
     payload = request.get_json(silent=True) or {}
-    overrides = payload.get("config_overrides") or {}
+    overrides = dict(payload.get("config_overrides") or {})
     parsed = _last_parsed_report()
     if parsed is None:
         return _err("no report converted yet", "no_report_yet", 400)
     info = (_last().get("bursting") or {})
-
+    rdl_xml = _apply_deploy_datasource(_last().get("rdl_xml") or "", request)
     try:
-        sql_override = overrides.get("EmailBurstSql")
-        email_sql = sql_override or _bursting_mod.build_email_burst_query(parsed, info)
-
-        ps_src = _bursting_mod._EMAIL_PS_TEMPLATE
-        rname = parsed.name or "report"
-        ps_src = ps_src.replace("__REPORT_NAME__", rname)
-        ps_src = ps_src.replace("__BURST_SQL__", email_sql.replace("\\", "\\\\"))
-
-        cfg_template = _bursting_mod.build_email_config_template(parsed, info)
-        json_overrides = {k: v for k, v in overrides.items() if k != "EmailBurstSql"}
-        cfg_json = _bursting_mod._apply_config_overrides(cfg_template, json_overrides)
-
-        checklist = _bursting_mod.build_service_account_checklist(parsed, info)
+        from converter import burst_pack as _bp
+        overrides.pop("EmailBurstSql", None)   # informational only now
+        if "report_server_url" not in overrides:
+            overrides["report_server_url"] = _REPORT_URL_STORE.get(_sid(), "")
+        pack = _bp.prepare(parsed.name or "report", rdl_xml, info, overrides)
         return jsonify({
-            "email_burst_query":        email_sql,
-            "email_powershell_script":  ps_src,
-            "email_config_template":    cfg_json,
-            "service_account_checklist": checklist,
+            "email_burst_query":        pack["burst_list_sql"],
+            "burst_list_sql":           pack["burst_list_sql"],
+            "burst_list_rdl":           pack["burst_list_rdl"] or "",
+            "burst_list_columns":       pack["columns"],
+            "email_powershell_script":  pack["driver"],
+            "powershell_script":        pack["driver"],
+            "email_config_template":    pack["config_json"],
+            "service_account_checklist": pack["checklist"],
+            "readme":                   pack["readme"],
+            "filter_injected":          bool(pack["meta"].get("injected")),
+            "filter_reason":            pack["meta"].get("reason", ""),
+            "bind_parameter":           pack["meta"].get("bind_parameter"),
+            "filename_pattern_normalized": pack["meta"].get("pattern"),
         })
     except Exception as e:
         traceback.print_exc()
@@ -1641,6 +1665,10 @@ def api_download_burst_pack():
     rdl_xml = _apply_deploy_datasource(rdl_xml, request)
 
     try:
+        overrides = dict(overrides)
+        overrides.pop("EmailBurstSql", None)
+        if "report_server_url" not in overrides:
+            overrides["report_server_url"] = _REPORT_URL_STORE.get(_sid(), "")
         blob = _bursting_mod.build_burst_pack_zip(parsed, rdl_xml, info, overrides)
         rname = parsed.name or "report"
         return send_file(

@@ -101,12 +101,15 @@ Click **Bursting**.
 
 If the sample triggered bursting detection:
 
-> "We detect the bursting pattern automatically from the source's file
-> template and per-recipient parameters. Here's the burst key field we
-> derived, the filename pattern, and a T-SQL recipient query. Download
-> the Burst Pack and you get the recipient SQL plus a PowerShell script
-> that loops the recipients, renders the report bound to each one, and
-> emails the rendered PDF. Drop-in DDS replacement for SSRS Standard."
+> "We detect the bursting pattern from the source's own distribution
+> declarations -- the file-name formula and the per-record destination.
+> Here's the burst key we derived and the file name pattern. Download the
+> Burst Pack and you get the report with one hidden per-key filter
+> parameter, a companion key-list report, and `Run-Burst.ps1`: it asks the
+> report server for the key list, renders the report once per key through
+> URL access, and saves each file under the Oracle name. Nothing installed
+> anywhere -- you can try it from your own PC with `-DryRun`. Enterprise
+> shops can paste the key-list SQL into a native Data-Driven Subscription."
 
 If the sample didn't trigger bursting, just say:
 

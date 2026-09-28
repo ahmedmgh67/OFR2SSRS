@@ -103,7 +103,7 @@ another module's internals.
   * `GET /api/download/rdl` — download the most recent RDL
   * `GET /api/download/bundle` — download the full conversion bundle (zip)
   * `GET /api/mockup/<variant>` — print or compact mockup variant
-  * `POST /api/burst-preview` — preview the burst recipient query
+  * `POST /api/burst-preview` — regenerate the Burst Pack files with UI settings
   * `POST /api/download/burst-pack` — download the Burst Pack zip
   * `GET /api/subreports` — list detected drill-through children
   * `POST /api/subreport/<child>/upload|clear|build` — manage a child report
@@ -351,13 +351,24 @@ file-template formula columns, `distribution.xml` payloads) and produces:
   address-shaped column name can never become an SMTP recipient by itself.
 * A `filename_pattern` — `<BurstKey>.pdf` by default, or the literal
   template from the source formula if present.
-* A T-SQL recipient query stub returning one row per recipient, with a
-  placeholder `Email` column.
-* A PowerShell DDS-emulator script that loops the recipient query, renders
-  the report bound to each burst key, and emails the rendered PDF. For
-  SSRS Standard installations that lack native Data-Driven Subscriptions.
+* The Burst Pack itself, built by `burst_pack.py` from the report's own
+  declarations: `inject_burst_key_filter` adds ONE hidden parameter
+  (`P_O2S_BURST_KEY`) and ONE dataset filter on the key dataset (SQL
+  untouched; empty value = the whole report); `build_burst_list_rdl` emits a
+  companion report grouping that dataset by the key so the report server
+  produces the key list (rendered as CSV); `burst_driver.ps1.txt` is the
+  constant, pure-ASCII, module-free Windows PowerShell 5.1 driver that
+  renders one file per key through URL access (`-DryRun`, `-TestLimit`,
+  `-Key`, `-Force`, rerun history, optional Send-MailMessage delivery).
+  The injection happens in `convert()` right after RDL generation so every
+  audit judges the downloaded file. The informational key-list SQL is
+  derived from the dataset's own CommandText for Enterprise data-driven
+  subscriptions; nothing in the pack executes SQL.
 
-The downloadable Burst Pack zip bundles all of the above plus a README.
+The downloadable Burst Pack zip bundles all of the above plus a README and
+the service-account checklist. `tests/test_burst_pack.py` parses the driver
+with the real PowerShell parser and executes it against a fake report
+server.
 
 ### 3.11 `backend/converter/subreports.py`
 

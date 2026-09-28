@@ -297,23 +297,41 @@ def build_checklist(report, rdl_xml: str, validation_issues: List[Dict[str, Any]
         ),
     })
 
-    # 9. Optional: data-driven subscription
-    steps.append({
-        "step": 9,
-        "status": "manual",
-        "title": "(Optional) Configure Data-Driven Subscription for bursting",
-        "body_md": (
-            "If the original Oracle Report ran a bursting loop (one PDF per permit, "
-            "emailed to the permittee), recreate that as a SSRS **Data-Driven Subscription**:\n\n"
-            "1. SSRS portal -> the report -> **Subscribe** -> **New Data-Driven Subscription**.\n"
-            "2. Use a SQL query that returns one row per output (e.g. `SELECT Permit_Num, "
-            "Email FROM v_Permit_Burst_List WHERE Active = 1`).\n"
-            "3. Map the columns to the subscription's `To`, `CC`, `Subject`, parameter "
-            "values, and rendering format (PDF / Excel / TIFF).\n"
-            "4. Schedule it (daily, weekly, etc.). Errors land in the SSRS execution log; "
-            "tail with `SELECT * FROM ReportServer.dbo.ExecutionLog3 ORDER BY TimeStart DESC`."
-        ),
-    })
+    # 9. Optional: bursting (one output per key). The checklist describes THIS
+    #    file: the per-key parameter is named only when the RDL declares it
+    #    (a bursting report), never as a generic mention.
+    if 'Name="P_O2S_BURST_KEY"' in (rdl_xml or ""):
+        steps.append({
+            "step": 9,
+            "status": "manual",
+            "title": "Bursting -- one rendered file per key",
+            "body_md": (
+                "This report distributed one output per record in Oracle. The RDL carries one "
+                "hidden parameter, `P_O2S_BURST_KEY`, that filters it to one key (empty = the "
+                "whole report as before). The **Bursting** tab's **Burst Pack** zip reproduces "
+                "the loop with nothing installed on any server:\n\n"
+                "1. Upload BOTH `<Report>.rdl` and `<Report>_BurstList.rdl` from the pack to the "
+                "same folder.\n"
+                "2. Fill `burst.config.json` (report server URL, folder, output folder) and run "
+                "`Run-Burst.ps1 -DryRun` from your own PC, then `-TestLimit 2`, then for real.\n"
+                "3. Schedule `Run-Burst.ps1` under a service account with the Browser role on "
+                "the folder (see `service-account-setup.md` in the pack).\n"
+                "4. **Enterprise edition only:** instead of the script, create a Data-Driven "
+                "Subscription on the report with the key-list SQL from the Bursting tab as its "
+                "query, mapped to `P_O2S_BURST_KEY`."
+            ),
+        })
+    else:
+        steps.append({
+            "step": 9,
+            "status": "manual",
+            "title": "(Optional) Bursting -- not used by this report",
+            "body_md": (
+                "This report runs once and prints one set of pages; no per-record distribution "
+                "was declared, so nothing here needs a burst loop. (When a source does distribute "
+                "one file per record, the **Bursting** tab builds a Burst Pack for it.)"
+            ),
+        })
 
     return steps
 

@@ -522,28 +522,58 @@
         <section id="burst-form-panel" class="panel-card burst-form-panel" hidden>
           <div class="panel-toolbar burst-form-head">
             <h2 class="panel-title">Distribution Settings</h2>
-            <div class="burst-form-hint muted-note">Change anything here, then click Update Preview or Download Burst Pack.</div>
+            <div class="burst-form-hint muted-note">Everything is prefilled from the report and the sidebar. Change what you need, then Download Burst Pack. You can change all of it later in <code>burst.config.json</code>.</div>
           </div>
           <div class="burst-form-grid">
             <label class="burst-field">
-              <span>Email server (SMTP host)</span>
-              <input id="bf-smtp-host" type="text" value="smtp.office365.com" autocomplete="off" spellcheck="false">
-            </label>
-            <label class="burst-field">
-              <span>Port</span>
-              <input id="bf-smtp-port" type="number" min="1" max="65535" value="587">
-            </label>
-            <label class="burst-field">
-              <span>How the email server signs you in</span>
-              <select id="bf-auth-mode">
-                <option value="Office365" selected>Office365</option>
-                <option value="Exchange">Exchange</option>
-                <option value="Anonymous-Relay">Anonymous-Relay</option>
+              <span>Deliver each file by</span>
+              <select id="bf-deliver">
+                <option value="file" selected>Saving to a folder</option>
+                <option value="email">Email</option>
+                <option value="both">Both</option>
               </select>
             </label>
             <label class="burst-field">
+              <span>Output format</span>
+              <select id="bf-format">
+                <option value="PDF" selected>PDF</option>
+                <option value="EXCELOPENXML">Excel (.xlsx)</option>
+                <option value="WORDOPENXML">Word (.docx)</option>
+              </select>
+            </label>
+            <label class="burst-field">
+              <span>Report server (service URL) <span class="burst-field-hint">usually <code>http://host/ReportServer</code>, not the /Reports portal</span></span>
+              <input id="bf-server" type="text" placeholder="http://your-server/ReportServer" autocomplete="off" spellcheck="false">
+            </label>
+            <label class="burst-field">
+              <span>Folder on the server <span class="burst-field-hint">where you upload both .rdl files</span></span>
+              <input id="bf-folder" type="text" value="/Reports" autocomplete="off" spellcheck="false">
+            </label>
+            <label class="burst-field">
+              <span>Save the files in</span>
+              <input id="bf-output" type="text" autocomplete="off" spellcheck="false">
+            </label>
+            <label class="burst-field">
+              <span>File name <span class="burst-field-hint">from the Oracle report; <code>&lt;Column&gt;</code> fills from the key list, <code>{date:yyyyMMdd}</code> is today</span></span>
+              <input id="bf-pattern" type="text" autocomplete="off" spellcheck="false">
+            </label>
+          </div>
+          <div id="bf-email-group" class="burst-form-grid" hidden>
+            <label class="burst-field">
+              <span>Email server (SMTP host)</span>
+              <input id="bf-smtp-host" type="text" placeholder="smtp.yourdomain.gov" autocomplete="off" spellcheck="false">
+            </label>
+            <label class="burst-field">
+              <span>Port</span>
+              <input id="bf-smtp-port" type="number" min="1" max="65535" value="25">
+            </label>
+            <label class="burst-field">
               <span>Sent from (email address)</span>
-              <input id="bf-sender" type="email" value="[email protected]" autocomplete="off" spellcheck="false">
+              <input id="bf-sender" type="email" placeholder="reports@yourdomain.gov" autocomplete="off" spellcheck="false">
+            </label>
+            <label class="burst-field">
+              <span>Recipient column <span class="burst-field-hint">add this column to the key-list report; each row's address gets that row's file</span></span>
+              <input id="bf-to-col" type="text" value="EmailTo" autocomplete="off" spellcheck="false">
             </label>
             <label class="burst-field burst-field-wide">
               <span>Subject line <span class="burst-field-hint">write <code>{BurstKey}</code> or <code>{ReportName}</code> where you want those filled in</span></span>
@@ -551,15 +581,7 @@
             </label>
             <label class="burst-field burst-field-wide">
               <span>Message <span class="burst-field-hint">the same fill-ins work here: <code>{BurstKey}</code>, <code>{ReportName}</code></span></span>
-              <textarea id="bf-body" rows="3" spellcheck="false">Hello,
-
-Your {ReportName} report for {BurstKey} is attached.
-
-- Reports</textarea>
-            </label>
-            <label class="burst-field burst-field-wide">
-              <span>SQL that lists the recipients <span class="burst-field-hint">started for you from the report this tool just read</span></span>
-              <textarea id="bf-sql" class="burst-field-code" rows="8" spellcheck="false"></textarea>
+              <textarea id="bf-body" rows="3" spellcheck="false">Your {ReportName} for {BurstKey} is attached.</textarea>
             </label>
           </div>
           <div class="burst-form-actions">

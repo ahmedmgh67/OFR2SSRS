@@ -3344,7 +3344,7 @@ function renderExtrasTab(data) {
   // meant nothing to a reader who has not met the term, so the heading says
   // what the report actually does.
   const burstTitle = burst.is_bursting
-    ? "Bursting — this report sends a copy per recipient"
+    ? "Bursting — this report produces one file per record"
     : "Bursting — not used by this report";
   burstSection.innerHTML = "<h3>" + burstTitle + "</h3>";
   if (burst.is_bursting) {
@@ -3552,9 +3552,11 @@ function showMockupCTA(data) {
 
 
 // ----- Tab: Bursting / Email distribution -----
-function renderBurstingTab(data) {
+function renderBurstingTab(data, opts) {
   const host = document.getElementById("burst-host");
   if (!host) return;
+  // keep the reader's place: which <details> were open before the rebuild
+  const openState = Array.from(host.querySelectorAll("details")).map((d) => d.open);
   host.innerHTML = "";
 
   const burst = (data && data.bursting) || {};
@@ -3579,23 +3581,38 @@ function renderBurstingTab(data) {
   // Plug-and-play: show + hydrate the Distribution Settings form when
   // bursting was detected. The form lives in the static HTML (above
   // #burst-host); we just hydrate values and wire its buttons once.
-  hydrateBurstForm(data, burst);
+  if (opts && opts.skipForm) {
+    const panel = document.getElementById("burst-form-panel");
+    if (panel) panel.hidden = !burst.is_bursting;
+  } else {
+    hydrateBurstForm(data, burst);
+  }
 
   // ---- Header: plain-English detection ----
   const header = document.createElement("div");
   header.className = "burst-header " + (burst.is_bursting ? "burst-yes" : "burst-no");
+  const keyc = escHtml(burst.burst_key_field || "record");
+  const patc = escHtml(burst.filename_pattern_normalized || burst.filename_pattern || "");
   if (burst.is_bursting) {
     header.innerHTML =
       '<div class="burst-h-icon">📨</div><div>' +
-      '<div class="burst-h-title">This report sends a copy to each recipient</div>' +
-      '<div class="burst-h-meta">In Oracle it sent a separate PDF to every ' +
-      '<code>' + escHtml(burst.burst_key_field || "recipient") + '</code>. ' +
-      'The Standard edition of SSRS cannot do that on its own, so the ' +
-      '<b>Burst Pack</b> below does it for you.</div></div>';
+      '<div class="burst-h-title">This report produced one file per ' + keyc + '</div>' +
+      '<div class="burst-h-meta">In Oracle it ran once and wrote a separate file for every ' +
+      '<code>' + keyc + '</code>' + (patc ? ' (named <code>' + patc + '</code>)' : '') + '. ' +
+      'SSRS cannot split one run into many files, so the <b>Burst Pack</b> below ' +
+      'renders the report once per key instead &mdash; on any SSRS edition, with ' +
+      'nothing installed on any server.</div>' +
+      (burst.filter_injected === false
+        ? '<div class="burst-h-meta burst-warn"><b>Heads up:</b> ' + escHtml(burst.filter_reason || "") +
+          '. The pack still renders once per key, but the report will not filter itself to ' +
+          'that key until a dataset filter on the key column is added in Report Builder ' +
+          '(against the parameter <code>' + escHtml(burst.bind_parameter || "P_O2S_BURST_KEY") + '</code>).</div>'
+        : '') +
+      '</div>';
   } else {
     header.innerHTML =
       '<div class="burst-h-icon">○</div><div>' +
-      '<div class="burst-h-title">This report does not send a copy per recipient</div>' +
+      '<div class="burst-h-title">This report does not produce one file per record</div>' +
       '<div class="burst-h-meta">It runs once and prints one set of pages, ' +
       'so there is nothing to split up here.</div></div>';
   }
@@ -3603,51 +3620,50 @@ function renderBurstingTab(data) {
 
   if (!burst.is_bursting) { setBadge("badge-burst", 0); return; }
 
-  const keyc = escHtml(burst.burst_key_field || "recipient");
-
   // ---- Turnkey "do exactly this" guide ----
   const brname = (data && data.report && data.report.name) || "your report";
+  const bindc = escHtml(burst.bind_parameter || "P_O2S_BURST_KEY");
   const guide = document.createElement("section");
   guide.className = "burst-section burst-guide o2s-howto";
   guide.innerHTML =
-    '<h3>What bursting does</h3>' +
-    '<div class="burst-meta">Bursting takes <b>one</b> report run and splits it into <b>many PDFs &mdash; one per ' +
-      'recipient</b> &mdash; then emails each to the right person automatically. Each <code>' + keyc +
-      '</code> gets only their own page.</div>' +
+    '<h3>What the Burst Pack does</h3>' +
+    '<div class="burst-meta">Three files work together. <b>' + escHtml(brname) + '.rdl</b> is your report ' +
+      'with one extra hidden parameter, <code>' + bindc + '</code>: set it and the report shows only that ' +
+      keyc + '; leave it empty and it is exactly the report you would deploy anyway (same SQL, same output). ' +
+      '<b>' + escHtml(brname) + '_BurstList.rdl</b> is the same dataset grouped by <code>' + keyc + '</code> ' +
+      '&mdash; the report server renders it as CSV, so the key list comes from your own data source. ' +
+      '<b>Run-Burst.ps1</b> loops: one render per key, saved under the Oracle file name' +
+      (patc ? ' (<code>' + patc + '</code>)' : '') + '.</div>' +
     '<div class="o2s-flow">' +
-      '<div class="o2s-node o2s-main"><div class="o2s-node-title">' + escHtml(brname) + '</div>' +
-        '<div class="o2s-node-sub">one run &middot; many rows</div></div>' +
+      '<div class="o2s-node o2s-main"><div class="o2s-node-title">' + escHtml(brname) + '_BurstList</div>' +
+        '<div class="o2s-node-sub">rendered as CSV &middot; one row per ' + keyc + '</div></div>' +
       '<div class="o2s-links">' +
-        '<div class="o2s-link"><span class="o2s-num">1</span><div>split by <code>' + keyc + '</code> ' +
-          '<span class="o2s-arrow">&rarr;</span> <b>one PDF each</b></div></div>' +
-        '<div class="o2s-link"><span class="o2s-num">2</span><div>each PDF <span class="o2s-arrow">&rarr;</span> ' +
-          '<b>emailed to that recipient</b> <em>(automatic)</em></div></div>' +
+        '<div class="o2s-link"><span class="o2s-num">1</span><div>for each key <span class="o2s-arrow">&rarr;</span> ' +
+          'render <b>' + escHtml(brname) + '</b> with <code>' + bindc + '</code> = that key</div></div>' +
+        '<div class="o2s-link"><span class="o2s-num">2</span><div>save as <b>' + (patc || 'one file per key') + '</b>' +
+          ' <em>(or email it)</em></div></div>' +
       '</div>' +
-      '<div class="o2s-node o2s-child"><div class="o2s-node-title">per-recipient PDF</div>' +
-        '<div class="o2s-node-sub">+ its own email</div></div>' +
+      '<div class="o2s-node o2s-child"><div class="o2s-node-title">one file per ' + keyc + '</div>' +
+        '<div class="o2s-node-sub">in the output folder</div></div>' +
     '</div>' +
     '<div class="burst-files-sub" style="margin-top:14px">Make it run &mdash; 4 steps</div>' +
     '<ol class="burst-steps">' +
-      '<li>In <b>Distribution Settings</b> above, set your email server and the ' +
-        'address the mail is sent from. Then edit <b>the SQL that lists the ' +
-        'recipients</b> so it returns <b>one row per person</b>: their email ' +
-        'address and their <code>' + keyc + '</code>. A working example is ' +
-        'filled in for you — point it at your own database.</li>' +
-      '<li>Click <b>Download Burst Pack</b>. You get one <code>.zip</code> file. ' +
-        '<b>Unzip it on your SSRS server.</b></li>' +
-      '<li>Follow <code>service-account-setup.md</code> in the pack: it sets up a ' +
-        'Windows account for the job and gives it permission to send mail. ' +
-        'You do this <b>once</b>, and it then covers every report.</li>' +
-      '<li>Run <code>Send-Reports.ps1</code> (right-click it, choose Run with ' +
-        'PowerShell) to send yourself a test. When that works, schedule it in ' +
-        'Task Scheduler. From then on, each person gets their own PDF.</li>' +
+      '<li>Check <b>Distribution Settings</b> above (the server and folder come from the sidebar; ' +
+        'the file name comes from the Oracle report) and click <b>Download Burst Pack</b>.</li>' +
+      '<li>Upload <b>both</b> <code>.rdl</code> files from the zip to that folder on the report server, ' +
+        'bound to the same shared data source. Open each once in the portal to see it run.</li>' +
+      '<li><b>Try it from your own PC</b> &mdash; no server access needed: ' +
+        '<code>powershell -ExecutionPolicy Bypass -File .\\Run-Burst.ps1 -DryRun</code> lists every key ' +
+        'and file name without rendering; <code>-TestLimit 2</code> renders two files. ' +
+        'Compare one with the Oracle output for the same ' + keyc + '.</li>' +
+      '<li>Hand <code>service-account-setup.md</code> to whoever owns the server: a service account ' +
+        'with the Browser role on the folder and a Task Scheduler entry. Nothing is installed.</li>' +
     '</ol>' +
-    '<div class="burst-callout"><b>There is one thing only you can supply:</b> ' +
-      'the recipient list — the SQL above that says who gets a copy and at ' +
-      'which address. Sending the mail, making the PDFs, going through the ' +
-      'recipients one by one, retrying, and not sending twice are all handled ' +
-      'for you. The full walkthrough is in <code>README.md</code> inside the ' +
-      'pack.</div>';
+    '<div class="burst-callout"><b>Nothing in the SQL changes.</b> The only difference between this RDL ' +
+      'and the plain download is the hidden <code>' + bindc + '</code> parameter and one dataset filter that ' +
+      'ignores an empty value &mdash; so the same file also serves as the normal report. ' +
+      'If your SSRS is <b>Enterprise</b> edition, you can skip the script and paste the key-list SQL ' +
+      'below into a native data-driven subscription mapped to <code>' + bindc + '</code>.</div>';
   host.appendChild(guide);
 
   // ---- Collapsed: the generated files (inspect/copy if you want) ----
@@ -3666,12 +3682,15 @@ function renderBurstingTab(data) {
       (hint ? '<div class="burst-hint">' + hint + '</div>' : '');
     files.appendChild(d);
   };
-  addBlock("email_burst_query", "The SQL that lists the recipients",
-    "This is the one query to replace with your own list of people and email addresses.", "sql");
-  addBlock("email_powershell_script", "Send-Reports.ps1",
-    "The script that does the work. It runs as the Windows account you set up, and reads its settings from burst.config.json each time it runs.", "");
+  addBlock("powershell_script", "Run-Burst.ps1",
+    "The loop. Windows PowerShell 5.1 built-ins only; it reads burst.config.json next to it on every run.", "");
   addBlock("email_config_template", "burst.config.json",
-    "The settings, already filled in from Distribution Settings above.", "");
+    "Every setting, already filled in from Distribution Settings above. Edit it any time.", "");
+  addBlock("burst_list_rdl", escHtml(brname) + "_BurstList.rdl",
+    "The key-list report: the same dataset grouped by " + keyc + ". Upload it next to the main report.", "xml");
+  addBlock("email_burst_query", "Key-list SQL (informational)",
+    "What the key list amounts to. Nothing in the pack runs it; it is the query to paste into an Enterprise data-driven subscription.", "sql");
+  addBlock("readme", "README.md", "", "");
   const checklist = burst.service_account_checklist || [];
   if (checklist.length) {
     const wrap = document.createElement("div");
@@ -3703,6 +3722,8 @@ function renderBurstingTab(data) {
       );
     });
   });
+
+  Array.from(host.querySelectorAll("details")).forEach((d, i) => { if (openState[i]) d.open = true; });
 
   // Set badge to 1 if bursting was detected (draws the eye)
   setBadge("badge-burst", burst.is_bursting ? 1 : 0);
@@ -4548,33 +4569,90 @@ if (document.readyState === "loading") {
 // =========================================================================
 
 function _bfDefaultBody() {
-  return "Hello,\n\nYour {ReportName} report for {BurstKey} is attached.\n\n- Reports";
+  return "Your {ReportName} for {BurstKey} is attached.";
 }
 
+// The sidebar's report-server URL is "http://host/ReportServer?/Folder":
+// the service endpoint and the folder both reports are uploaded to.
+function _bfSidebarServer() {
+  const rsu = (typeof getReportServerUrl === "function" ? getReportServerUrl() : "") || "";
+  const q = rsu.indexOf("?");
+  const server = (q >= 0 ? rsu.slice(0, q) : rsu).replace(/\/+$/, "");
+  let folder = q >= 0 ? rsu.slice(q + 1) : "";
+  folder = folder.replace(/^\/+|\/+$/g, "");
+  return { server: server, folder: folder ? "/" + folder : "" };
+}
+
+function _bfSplitServerUrl(rsu) {
+  const u = String(rsu || "");
+  const q = u.indexOf("?");
+  return { server: (q >= 0 ? u.slice(0, q) : u).replace(/\/+$/, ""),
+           folder: q >= 0 ? u.slice(q + 1) : "" };
+}
+
+// Every value maps 1:1 onto a burst.config.json key (the driver reads the
+// file, never the UI). Empty fields are DROPPED so the server-side defaults
+// (derived from the report + the sidebar) fill them in.
 function _bfReadForm() {
   const g = (id) => document.getElementById(id);
-  const port = parseInt((g("bf-smtp-port") || {}).value, 10);
-  return {
-    SmtpServer:      (g("bf-smtp-host") || {}).value || "smtp.office365.com",
-    SmtpPort:        Number.isFinite(port) ? port : 587,
-    AuthMode:        (g("bf-auth-mode") || {}).value || "Office365",
-    SmtpFrom:        (g("bf-sender") || {}).value || "[email protected]",
-    SubjectTemplate: (g("bf-subject") || {}).value || "{ReportName} - {BurstKey}",
-    BodyTemplate:    (g("bf-body") || {}).value || _bfDefaultBody(),
-    EmailBurstSql:   (g("bf-sql") || {}).value || "",
+  const v = (id) => { const el = g(id); return el ? String(el.value || "").trim() : ""; };
+  const port = parseInt(v("bf-smtp-port"), 10);
+  const server = v("bf-server").replace(/\/+$/, "");
+  let folder = v("bf-folder").replace(/\/+$/, "");
+  if (folder && folder[0] !== "/") folder = "/" + folder;
+  const o = {
+    Deliver:           v("bf-deliver") || "file",
+    RenderFormat:      v("bf-format") || "PDF",
+    report_server_url: server ? server + (folder ? "?" + folder : "") : "",
+    OutputRoot:        v("bf-output"),
+    FileNamePattern:   v("bf-pattern"),
+    SmtpServer:        v("bf-smtp-host"),
+    SmtpPort:          Number.isFinite(port) ? port : 25,
+    SmtpFrom:          v("bf-sender"),
+    EmailToColumn:     v("bf-to-col"),
+    Subject:           v("bf-subject"),
+    Body:              v("bf-body"),
   };
+  Object.keys(o).forEach((k) => { if (o[k] === "") delete o[k]; });
+  return o;
 }
 
 function _bfWriteForm(o) {
   const g = (id) => document.getElementById(id);
+  const set = (id, val) => {
+    const el = g(id);
+    if (!el || val == null) return;
+    if (el === document.activeElement) return;          // never fight the caret
+    if (String(el.value) !== String(val)) el.value = val;
+  };
   if (!o) return;
-  if (g("bf-smtp-host"))  g("bf-smtp-host").value  = o.SmtpServer || "smtp.office365.com";
-  if (g("bf-smtp-port"))  g("bf-smtp-port").value  = (o.SmtpPort != null ? o.SmtpPort : 587);
-  if (g("bf-auth-mode"))  g("bf-auth-mode").value  = o.AuthMode || "Office365";
-  if (g("bf-sender"))     g("bf-sender").value     = o.SmtpFrom || "[email protected]";
-  if (g("bf-subject"))    g("bf-subject").value    = o.SubjectTemplate || "{ReportName} - {BurstKey}";
-  if (g("bf-body"))       g("bf-body").value       = o.BodyTemplate || _bfDefaultBody();
-  if (g("bf-sql") && o.EmailBurstSql != null) g("bf-sql").value = o.EmailBurstSql;
+  const sf = _bfSplitServerUrl(o.report_server_url);
+  set("bf-deliver", o.Deliver || "file");
+  set("bf-format", o.RenderFormat || "PDF");
+  set("bf-server", sf.server);
+  set("bf-folder", sf.folder || "/Reports");
+  set("bf-output", o.OutputRoot || "");
+  set("bf-pattern", o.FileNamePattern || "");
+  set("bf-smtp-host", o.SmtpServer || "");
+  set("bf-smtp-port", o.SmtpPort != null ? o.SmtpPort : 25);
+  set("bf-sender", o.SmtpFrom || "");
+  set("bf-to-col", o.EmailToColumn || "EmailTo");
+  set("bf-subject", o.Subject || "{ReportName} - {BurstKey}");
+  set("bf-body", o.Body || _bfDefaultBody());
+  _bfToggleEmail();
+}
+
+function _bfSwapExtension(pattern, fmt) {
+  const ext = { PDF: ".pdf", EXCELOPENXML: ".xlsx", WORDOPENXML: ".docx" }[String(fmt || "").toUpperCase()];
+  const p = String(pattern || "");
+  if (!ext || !p) return p;
+  return /\.(pdf|xlsx|xls|docx|doc|csv|xml|mhtml|tif|tiff)$/i.test(p) ? p.replace(/\.[A-Za-z0-9]+$/, ext) : p + ext;
+}
+
+function _bfToggleEmail() {
+  const sel = document.getElementById("bf-deliver");
+  const grp = document.getElementById("bf-email-group");
+  if (sel && grp) grp.hidden = (sel.value === "file");
 }
 
 function hydrateBurstForm(data, burst) {
@@ -4587,20 +4665,29 @@ function hydrateBurstForm(data, burst) {
   }
   panel.hidden = false;
 
-  if (!state.burstOverrides) {
+  const rname = (data && data.report && data.report.name) || "report";
+  // A new report in the same session starts from ITS declarations (its
+  // file-name pattern, its name in the output folder), not the last one's.
+  let fresh = false;
+  if (!state.burstOverrides || state.burstOverrides._for !== rname || state.burstOverrides._data !== data) {
+    fresh = true;
+    const sb = _bfSidebarServer();
     state.burstOverrides = {
-      SmtpServer:      "smtp.office365.com",
-      SmtpPort:        587,
-      AuthMode:        "Office365",
-      SmtpFrom:        "[email protected]",
-      SubjectTemplate: "{ReportName} - {BurstKey}",
-      BodyTemplate:    _bfDefaultBody(),
-      EmailBurstSql:   burst.email_burst_query || "",
+      _for:              rname,
+      _data:             data,
+      Deliver:           "file",
+      RenderFormat:      "PDF",
+      report_server_url: sb.server ? sb.server + (sb.folder ? "?" + sb.folder : "") : "",
+      OutputRoot:        "C:\\Oracle2SSRS\\" + rname + "\\out",
+      FileNamePattern:   burst.filename_pattern_normalized || burst.filename_pattern || "",
+      SmtpPort:          25,
+      EmailToColumn:     "EmailTo",
+      Subject:           "{ReportName} - {BurstKey}",
+      Body:              _bfDefaultBody(),
     };
-  } else if (!state.burstOverrides.EmailBurstSql && burst.email_burst_query) {
-    state.burstOverrides.EmailBurstSql = burst.email_burst_query;
   }
   _bfWriteForm(state.burstOverrides);
+  if (fresh) _burstPreview(state.burstOverrides);   // re-render skips the form: no loop
 
   if (!panel._wired) {
     panel._wired = true;
@@ -4614,37 +4701,49 @@ function hydrateBurstForm(data, burst) {
       };
     };
 
+    const readInto = () => {
+      const prev = state.burstOverrides || {};
+      state.burstOverrides = Object.assign({ _for: prev._for || rname, _data: prev._data || data }, _bfReadForm());
+    };
+
     const triggerPreview = debounce(() => {
-      state.burstOverrides = _bfReadForm();
+      readInto();
       _burstPreview(state.burstOverrides);
     }, 300);
 
-    ["bf-smtp-host","bf-smtp-port","bf-auth-mode","bf-sender",
-     "bf-subject","bf-body","bf-sql"].forEach((id) => {
+    const fmtSel = document.getElementById("bf-format");
+    if (fmtSel) fmtSel.addEventListener("change", () => {
+      const pat = document.getElementById("bf-pattern");
+      if (pat) pat.value = _bfSwapExtension(pat.value, fmtSel.value);
+    });
+
+    ["bf-deliver","bf-format","bf-server","bf-folder","bf-output","bf-pattern",
+     "bf-smtp-host","bf-smtp-port","bf-sender","bf-to-col","bf-subject","bf-body"].forEach((id) => {
       const ele = document.getElementById(id);
       if (!ele) return;
-      ele.addEventListener("input", () => {
-        state.burstOverrides = _bfReadForm();
-        triggerPreview();
-      });
-      ele.addEventListener("change", () => {
-        state.burstOverrides = _bfReadForm();
-        triggerPreview();
-      });
+      ele.addEventListener("input", () => { readInto(); _bfToggleEmail(); triggerPreview(); });
+      ele.addEventListener("change", () => { readInto(); _bfToggleEmail(); triggerPreview(); });
     });
 
     const upd = document.getElementById("bf-update");
     if (upd) upd.addEventListener("click", () => {
-      state.burstOverrides = _bfReadForm();
+      readInto();
       _burstPreview(state.burstOverrides);
     });
 
     const dl = document.getElementById("bf-download");
     if (dl) dl.addEventListener("click", () => {
-      state.burstOverrides = _bfReadForm();
+      readInto();
       _burstPackDownload(state.burstOverrides);
     });
   }
+}
+
+function _bfWireOverrides(overrides) {
+  const o = Object.assign({}, overrides || {});
+  delete o._for;
+  delete o._data;
+  return o;
 }
 
 function _burstPreview(overrides) {
@@ -4653,16 +4752,13 @@ function _burstPreview(overrides) {
   fetch("/api/burst-preview", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ config_overrides: overrides || {} }),
+    body: JSON.stringify({ config_overrides: _bfWireOverrides(overrides),
+                           shared_ds_path: getSharedDsPath(),
+                           report_server_url: getReportServerUrl() }),
   }).then((r) => r.json()).then((resp) => {
     if (resp && !resp.error && state.data) {
-      state.data.bursting = Object.assign({}, state.data.bursting, {
-        email_burst_query:         resp.email_burst_query,
-        email_powershell_script:   resp.email_powershell_script,
-        email_config_template:     resp.email_config_template,
-        service_account_checklist: resp.service_account_checklist,
-      });
-      renderBurstingTab(state.data);
+      state.data.bursting = Object.assign({}, state.data.bursting, resp);
+      renderBurstingTab(state.data, { skipForm: true });
       setInlineStatus(status, "done", "Preview updated with your settings.");
     } else {
       const why = (resp && resp.error)
@@ -4670,7 +4766,7 @@ function _burstPreview(overrides) {
       setInlineStatus(status, "failed", why);
       statusFail("Could not update the distribution preview",
         { why: why, subject: "Distribution settings",
-          next: "Check the Email-Source SQL box below for a typo, then press "
+          next: "Check the report server URL and folder above, then press "
               + "Update Preview again." });
     }
   }).catch((err) => {
@@ -4689,8 +4785,9 @@ function _burstPackDownload(overrides) {
   fetch("/api/download/burst-pack", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ config_overrides: overrides || {},
-                           shared_ds_path: getSharedDsPath() }),
+    body: JSON.stringify({ config_overrides: _bfWireOverrides(overrides),
+                           shared_ds_path: getSharedDsPath(),
+                           report_server_url: getReportServerUrl() }),
   }).then((r) => {
     if (!r.ok) {
       return r.json().then((j) => { throw new Error((j && j.error) || ("HTTP " + r.status)); });
@@ -4723,7 +4820,7 @@ function _burstPackDownload(overrides) {
     statusFail("Could not build the burst pack",
       { why: why, subject: "Burst pack",
         next: "Nothing was downloaded. Press Update Preview first: if that "
-            + "fails too, the Email-Source SQL is the thing to fix." });
+            + "fails too, the report server URL or folder above is the thing to fix." });
   });
 }
 

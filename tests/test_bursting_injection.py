@@ -32,24 +32,27 @@ class _R:
         self.queries = queries or []
 
 
-def test_powershell_param_name_cannot_close_hashtable():
+def test_powershell_param_name_never_reaches_the_driver():
+    """A hostile PARAMETER name cannot reach PowerShell syntax at all: the
+    driver is a constant text with only the report name spliced in, and
+    parameter names live in burst.config.json (JSON-escaped) which the
+    driver reads back with ConvertFrom-Json -- data, never code."""
     hostile = 'X = $null }\n    Invoke-Expression "calc" # '
     rep = _R("Rpt", params=[_P(hostile, label="L")])
     ps = build_powershell_dds_script(rep, {}, "report.rdl")
-    block = ps.split("$ReportParameters = @{", 1)[1].split("}", 1)[0]
-    # The hostile name is reduced to a clean identifier on ONE line -- the
-    # injected brace, newline, quote, and the Invoke-Expression *cmdlet* (which
-    # has a hyphen the sanitizer strips) cannot appear inside the hashtable.
-    assert '"' not in block
-    assert "Invoke-Expression" not in block
-    assert "\n    Invoke" not in block
+    assert "Invoke-Expression" not in ps
+    assert "$null }" not in ps
+    assert "calc" not in ps
 
 
-def test_powershell_report_name_is_escaped():
-    rep = _R('R"X', params=[_P("P_X", label="L")])
+def test_powershell_report_name_is_sanitized():
+    """The report name is the ONE report-derived text in the driver; it goes
+    through a whitelist (letters, digits, _ . - space) so it can never close
+    the comment block, the quoted string, or open a subexpression."""
+    rep = _R('R"X\'Y$(calc)`n#>; Remove-Item', params=[_P("P_X", label="L")])
     ps = build_powershell_dds_script(rep, {}, "report.rdl")
-    assert 'R`"X' in ps      # the embedded double-quote is backtick-escaped
-    assert 'R"X' not in ps    # ...so the raw, string-terminating form is gone
+    assert 'R"X' not in ps and "X'Y" not in ps and "$(calc)" not in ps and "#>;" not in ps
+    assert "R_X_Y__calc__n___ Remove-Item" in ps
 
 
 def test_sql_filename_pattern_cannot_break_literal():

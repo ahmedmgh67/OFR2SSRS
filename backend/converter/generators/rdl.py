@@ -32407,6 +32407,25 @@ def _assert_no_comment_nodes(xml_body: str) -> None:
             "emitted RDL — non-element nodes must never ship")
 
 
+def _strip_empty_report_items(root) -> int:
+    """Drop every <ReportItems> that holds no item.
+
+    RDL requires at least one child inside <ReportItems> but lets a Body,
+    Rectangle or page band omit the element altogether, so an empty one is
+    upload-fatal (XSD + the engine reject it) while its absence is legal. A
+    source with no layout (a foreign file that is not an Oracle Reports
+    export) reached exactly that shape; the preflight BLOCKER already says
+    the report has no content -- the file itself must still be valid RDL.
+    Returns the number removed."""
+    removed = 0
+    for parent in list(root.iter()):
+        for child in list(parent):
+            if str(child.tag).endswith("ReportItems") and len(child) == 0:
+                parent.remove(child)
+                removed += 1
+    return removed
+
+
 def generate_rdl(report: ParsedReport, target_db: str = "oracle") -> str:
     """Return a complete RDL XML document as a string."""
     target_db = (target_db or "oracle").lower()
@@ -32625,6 +32644,7 @@ def generate_rdl(report: ParsedReport, target_db: str = "oracle") -> str:
     _confirm_blank_token_findings(report, root)
     _strip_internal_markers(root)
     _strip_empty_expressions(root)
+    _strip_empty_report_items(root)
     _strip_non_element_nodes(root)
     try:
         ET.indent(root, space="  ")

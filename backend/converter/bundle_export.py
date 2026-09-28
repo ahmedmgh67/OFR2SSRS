@@ -224,9 +224,9 @@ def _readme_md(data: Dict[str, Any], file_list: List[str]) -> str:
     if is_bursting:
         nxt = 5 if counts["ai_prompts"] else 4
         lines.append(f"{nxt}. This report is a **bursting** report.  See `bursting/` for the")
-        lines.append("   `burst_query.sql` (lists every recipient) and `dds_emulator.ps1` (loops")
-        lines.append("   the parameters and renders one PDF per burst key – the SSRS-side")
-        lines.append("   replacement for Oracle's Data Distribution Service).")
+        lines.append("   key-list report, `Run-Burst.ps1` and `burst.config.json`: the Burst Pack")
+        lines.append("   renders one file per burst key through the report server – the SSRS-side")
+        lines.append("   replacement for Oracle's distribution (see the Bursting tab for the zip).")
     last = 6 if (is_bursting and counts["ai_prompts"]) else (5 if (is_bursting or counts["ai_prompts"]) else 4)
     lines.append(f"{last}. `audit_trail.json` is the full step-by-step record of every")
     lines.append("   transformation the converter applied – useful for code review and")
@@ -273,8 +273,11 @@ def build_bundle_zip(conversion_data: Dict[str, Any]) -> bytes:
         "ai_prompts.md",
     ]
     if is_bursting:
-        file_list.append("bursting/burst_query.sql")
-        file_list.append("bursting/dds_emulator.ps1")
+        file_list.append("bursting/burst_key_list.sql")
+        file_list.append("bursting/Run-Burst.ps1")
+        file_list.append("bursting/burst.config.json")
+        if bursting.get("burst_list_rdl"):
+            file_list.append("bursting/" + name + "_BurstList.rdl")
     file_list.append("README.md")
 
     buf = io.BytesIO()
@@ -289,15 +292,21 @@ def build_bundle_zip(conversion_data: Dict[str, Any]) -> bytes:
         zf.writestr("ai_prompts.md", _ai_prompts_md(ai_prompts))
 
         if is_bursting:
-            burst_sql = bursting.get("burst_query") or "-- no burst query produced\n"
-            burst_ps1 = bursting.get("powershell_script") or "# no DDS emulator produced\n"
+            burst_sql = bursting.get("burst_query") or "-- no key-list query produced\n"
+            burst_ps1 = bursting.get("powershell_script") or "# no burst driver produced\n"
             header = (
-                "-- Burst recipient query\n"
+                "-- Burst key-list query (informational: for an Enterprise data-driven\n"
+                "-- subscription; the Burst Pack driver never runs SQL)\n"
                 f"-- Burst key field : {bursting.get('burst_key_field') or ''}\n"
-                f"-- Filename pattern: {bursting.get('filename_pattern') or ''}\n\n"
+                f"-- Filename pattern: {bursting.get('filename_pattern_normalized') or bursting.get('filename_pattern') or ''}\n\n"
             )
-            zf.writestr("bursting/burst_query.sql", header + burst_sql)
-            zf.writestr("bursting/dds_emulator.ps1", burst_ps1)
+            zf.writestr("bursting/burst_key_list.sql", header + burst_sql)
+            # UTF-8 BOM: Windows PowerShell 5.1 reads a BOM-less file as ANSI
+            zf.writestr("bursting/Run-Burst.ps1", b"\xef\xbb\xbf" + burst_ps1.encode("utf-8"))
+            zf.writestr("bursting/burst.config.json", bursting.get("email_config_template") or "{}")
+            if bursting.get("burst_list_rdl"):
+                zf.writestr("bursting/" + name + "_BurstList.rdl",
+                            bursting["burst_list_rdl"])
 
         zf.writestr("README.md", _readme_md(data, file_list))
 

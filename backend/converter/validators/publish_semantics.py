@@ -424,6 +424,15 @@ def _expression_sites(model: _Model):
             ctx = ctx.child(in_group_member=has_group or ctx.in_group_member)
         elif t in ("Textbox", "Image", "Subreport", "Rectangle", "Line"):
             owner = (el.get("Name") or "").strip() or owner
+        elif t == "DataSet":
+            # [MS-RDL] DataSet.Filters: a dataset filter's expressions are
+            # evaluated per row of THAT dataset, so a bare Fields! reference
+            # inside one is scoped to it (the Burst Pack's per-key filter is
+            # exactly this shape). Without this, a multi-dataset report's
+            # dataset filter was judged "outside any data region".
+            name = (el.get("Name") or "").strip()
+            owner = name or owner
+            ctx = ctx.child(regions=ctx.regions + [(name, name or None)])
         elif t == "SortExpressions":
             kind = "SortExpression"
         elif t == "Filters":

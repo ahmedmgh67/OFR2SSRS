@@ -15,7 +15,10 @@ param(
     [Parameter(Mandatory=$true)][string]$RdlPath,
     [Parameter(Mandatory=$true)][string]$DataJson,
     [Parameter(Mandatory=$true)][string]$OutPdf,
-    [string]$LibDir = (Join-Path $PSScriptRoot "lib")
+    [string]$LibDir = (Join-Path $PSScriptRoot "lib"),
+    # Render format: PDF (default) or any other LocalReport renderer name
+    # (CSV, EXCELOPENXML, ...). Non-PDF output is still written to $OutPdf.
+    [string]$Format = "PDF"
 )
 
 $ErrorActionPreference = "Stop"
@@ -114,7 +117,7 @@ try {
     Write-Output "STAGE render-start"
     $mime = $null; $enc = $null; $ext = $null; $ids = $null
     $warnings = $null
-    $bytes = $lr.Render("PDF", $null, [ref]$mime, [ref]$enc, [ref]$ext,
+    $bytes = $lr.Render($Format, $null, [ref]$mime, [ref]$enc, [ref]$ext,
                         [ref]$ids, [ref]$warnings)
     [System.IO.File]::WriteAllBytes($OutPdf, $bytes)
 

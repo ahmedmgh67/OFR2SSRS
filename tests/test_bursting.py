@@ -142,37 +142,75 @@ def test_build_burst_pack_zip_contents_and_overrides():
     r = _make_bursting_report()
     info = b.detect_bursting(r)
     overrides = {
-        "SmtpServer":      "smtp.office365.com",
-        "SmtpPort":        587,
-        "AuthMode":        "Office365",
-        "SmtpFrom":        "[email protected]",
-        "SubjectTemplate": "{ReportName} - {BurstKey}",
-        "BodyTemplate":    "Body for {BurstKey}",
+        "Deliver":    "both",
+        "SmtpServer": "smtp.example.test",
+        "SmtpPort":   587,
+        "SmtpFrom":   "reports@example.test",
+        "Subject":    "{ReportName} - {BurstKey}",
+        "Body":       "Body for {BurstKey}",
+        "report_server_url": "http://srv/ReportServer?/Env/Letters",
     }
     blob = b.build_burst_pack_zip(r, "<Report/>", info, overrides)
     z = zipfile.ZipFile(io.BytesIO(blob))
     names = sorted(z.namelist())
+    # "<Report/>" declares no dataset: no per-key filter and therefore no
+    # key-list report -- the pack still ships and the README says why.
     assert names == sorted([
-        "TEST_REPORT.rdl", "burst.config.json", "Send-Reports.ps1",
+        "TEST_REPORT.rdl", "burst.config.json", "Run-Burst.ps1",
         "README.md", "service-account-setup.md",
     ])
     cfg = json.loads(z.read("burst.config.json"))
-    for k, v in overrides.items():
-        assert cfg[k] == v
-    ps = z.read("Send-Reports.ps1").decode("utf-8")
-    assert "TEST_REPORT" in ps
-    assert "Burst_Key" in ps
+    for k in ("Deliver", "SmtpServer", "SmtpPort", "SmtpFrom", "Subject", "Body"):
+        assert cfg[k] == overrides[k]
+    assert cfg["ReportServer"] == "http://srv/ReportServer"
+    assert cfg["ReportPath"] == "/Env/Letters/TEST_REPORT"
+    # no key-list report could be built -> the driver must refuse to run
+    # (exit 2) rather than ask the server for an item that does not exist
+    assert cfg["BurstListPath"] == ""
+    assert cfg["BindParameter"] == "P_O2S_BURST_KEY"
+    ps = z.read("Run-Burst.ps1")
+    assert ps.startswith(b"\xef\xbb\xbf"), "the driver ships with a UTF-8 BOM"
+    text = ps[3:].decode("ascii")
+    assert "TEST_REPORT" in text and "P_O2S_BURST_KEY" in text
     readme = z.read("README.md").decode("utf-8")
-    assert "smtp.office365.com" in readme
+    assert "Run-Burst.ps1" in readme and "TEST_REPORT_BurstList.rdl" in readme
+    assert "not a field of any dataset" in readme
 
 
-def test_burst_pack_uses_overridden_sql():
+def _rdl_with_dataset(sql="SELECT a.Perm_Num, a.Site_Name FROM Permit a"):
+    return (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition">\n'
+        '  <DataSources><DataSource Name="DS"><DataSourceReference>/DS/Oracle</DataSourceReference>'
+        '</DataSource></DataSources>\n'
+        '  <DataSets>\n    <DataSet Name="Q_MAIN">\n      <Query><DataSourceName>DS</DataSourceName>'
+        '<CommandText>' + sql + '</CommandText></Query>\n'
+        '      <Fields><Field Name="Perm_Num"><DataField>Perm_Num</DataField></Field>'
+        '<Field Name="Site_Name"><DataField>Site_Name</DataField></Field></Fields>\n'
+        '    </DataSet>\n  </DataSets>\n'
+        '  <Body><ReportItems/><Height>1in</Height></Body>\n  <Width>7.5in</Width>\n</Report>\n'
+    )
+
+
+def test_burst_pack_driver_carries_no_sql_and_the_key_list_sql_is_the_reports_own():
+    """The driver never touches a database: the key list is the report server
+    rendering the companion report. The SQL shown in the tab is informational
+    (for an Enterprise data-driven subscription) and is derived from the
+    report's OWN CommandText, never from a table name we guess."""
     r = _make_bursting_report()
     info = b.detect_bursting(r)
-    custom_sql = "-- USER EDITED\nSELECT * FROM custom_view"
-    overrides = {"EmailBurstSql": custom_sql}
-    blob = b.build_burst_pack_zip(r, "<Report/>", info, overrides)
+    blob = b.build_burst_pack_zip(r, _rdl_with_dataset(), info)
     z = zipfile.ZipFile(io.BytesIO(blob))
-    ps = z.read("Send-Reports.ps1").decode("utf-8")
-    assert "USER EDITED" in ps
-    assert "custom_view" in ps
+    assert "TEST_REPORT_BurstList.rdl" in z.namelist()
+    ps = z.read("Run-Burst.ps1")[3:].decode("ascii")
+    assert "SELECT " not in ps and "Invoke-Sqlcmd" not in ps and "Import-Module" not in ps
+    readme = z.read("README.md").decode("utf-8")
+    assert "SELECT DISTINCT Perm_Num AS BURST_KEY" in readme
+    assert "FROM Permit a" in readme
+    cfg = json.loads(z.read("burst.config.json"))
+    assert cfg["BurstListPath"].endswith("/TEST_REPORT_BurstList")
+    assert cfg["KeyField"] == "Perm_Num"
+    # the Oracle key token resolves: the key list carries the key as BURST_KEY
+    assert cfg["FileNamePattern"] == "<BURST_KEY>.pdf"
+
+

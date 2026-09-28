@@ -309,15 +309,16 @@
       if (isBursting) {
         await next(clickTab("burst"), "Bursting — one run, one PDF per person",
           "In Oracle this report went out per recipient, so Bursting is a " +
-          "main view here. It builds the pack that splits one run into one " +
-          "PDF per person and emails each one, using your service account. " +
+          "main view here. It builds the Burst Pack: the report with a hidden " +
+          "per-key filter, a key-list report, and a driver that renders one " +
+          "file per key through the report server - nothing to install. " +
           "This is what replaces Oracle's <i>distribute=YES</i>.");
       } else {
         await next(clickTab("burst"), "Bursting — this report does not use it",
         "This report runs once and prints one set of pages: nothing in it " +
-        "sends a copy per recipient. So Bursting sits under <b>Advanced " +
-        "views</b>. When a report does burst — one PDF per person, emailed " +
-        "automatically — this view moves out in front and builds the pack " +
+        "produces one file per record. So Bursting sits under <b>Advanced " +
+        "views</b>. When a report does burst — one file per permit, invoice " +
+        "or recipient — this view moves out in front and builds the pack " +
         "for you.");
       }
 

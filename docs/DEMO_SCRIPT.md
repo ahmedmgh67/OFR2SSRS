@@ -56,8 +56,7 @@
      errors at the top.
    - **Deploy Checklist** — punch list to take the RDL from local file
      to running on a real SSRS server.
-   - **Extras** — translation audit trail + AI prompts + optional Claude
-     auto-fix.
+   - **Extras** — fidelity scorecard + translation audit trail.
 
 8. **Click Download .rdl** in the sidebar. "There's the file you upload
    to your SSRS server. Or click Download Bundle to get the RDL plus the
@@ -96,7 +95,6 @@
   with an audit-trail entry. The user knows exactly which lines the
   converter is confident about and which to review.
 - **Offline by default.** No SaaS, no telemetry, no API keys required.
-  Optional Claude assist is opt-in via `.env`.
 
 ## Backup plan if something breaks
 

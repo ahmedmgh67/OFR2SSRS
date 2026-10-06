@@ -32,10 +32,6 @@ All endpoints live under the Flask app in `backend/app.py` and listen on
 | POST   | `/api/subreport/<child>/upload`            | Attach artifacts to a child report                            |
 | POST   | `/api/subreport/<child>/clear`             | Clear attached artifacts on a child report                    |
 | POST   | `/api/subreport/<child>/build`             | Build the RDL for a child report                              |
-| GET    | `/api/ai/status`                           | Is the optional Claude assist configured?                     |
-| GET    | `/api/ai/test`                             | Smoke-test the configured Anthropic API key                   |
-| POST   | `/api/auto-fix`                            | Run Claude on every prompt, apply each                        |
-| POST   | `/api/apply-fix`                           | Apply one pasted UDF body back into the RDL                   |
 | GET    | `/api/recent/clear`                        | Clear the in-memory recent-conversion cache                   |
 | GET    | `/api/health`                              | Health probe + list of bundled samples                        |
 
@@ -188,7 +184,7 @@ Streams the most recently generated RDL as a downloadable file.
 ## `GET /api/download/bundle`
 
 Streams a `.zip` containing the most recent RDL plus the full conversion
-artifacts: validation report, deploy checklist, audit trail, AI prompts,
+artifacts: validation report, deploy checklist, audit trail,
 Burst Pack (if bursting was detected), and a README explaining what's
 inside.
 
@@ -324,34 +320,6 @@ SQLite and registers Python UDFs for the `dbo.fn_*` package stubs.
 
 ---
 
-## `GET /api/ai/status`
-
-Reports whether the optional Claude assist is configured.
-
-**Response 200**
-
-```json
-{ "configured": true, "model": "claude-..." }
-```
-
-`configured` is `true` when `ANTHROPIC_API_KEY` is set in the process
-environment (or loaded from `.env` at startup).
-
-## `GET /api/ai/test`
-
-Sends a trivial probe to the Anthropic API to confirm the key is valid.
-
-## `POST /api/auto-fix`
-
-Iterates every AI prompt in the current conversion, calls Claude once
-per prompt, validates the response, and patches the RDL in place.
-
-## `POST /api/apply-fix`
-
-Applies one manually-pasted UDF body back into the RDL.
-
----
-
 ## `GET /api/recent/clear`
 
 Clears the in-memory recent-conversion cache. Useful in development when
@@ -395,8 +363,7 @@ The shape returned by every successful `/api/convert*` call:
                              "region": "page_header" }, ... ],
   "bursting":            { ... },
   "subreports":          { ... },
-  "audit_trail":         [ AuditEntry, ... ],
-  "ai_prompts":          [ ... ]
+  "audit_trail":         [ AuditEntry, ... ]
 }
 ```
 

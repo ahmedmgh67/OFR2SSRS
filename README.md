@@ -125,7 +125,7 @@ Every conversion surfaces **four main tabs**:
   each child.
 
 Advanced views (side-by-side diff, validation, deploy checklist, and an
-Extras panel with the audit trail and AI prompts) are one click away behind
+Extras panel with the fidelity report and audit trail) are one click away behind
 an **Advanced views** toggle.
 
 ## Feature highlights
@@ -310,16 +310,10 @@ The parser cross-checks bind variables, parameter names, and column
 references against any `.sql`, `.docx`, or screenshot you dropped in, and
 surfaces a pre-flight audit.
 
-### Optional Claude auto-fix
-
-If `ANTHROPIC_API_KEY` is set in `.env`, the Extras tab can call Claude once
-per AI prompt, validate each result, and patch the RDL in place. Without a
-key the prompt templates are still rendered for paste-into-Copilot use.
-
 ### Bundle download
 
 One click produces a `.zip` of the RDL, validation report, deploy checklist,
-audit trail, AI prompts, burst pack, and a README explaining what's inside.
+audit trail, burst pack, and a README explaining what's inside.
 
 ## Manual deploy workflow
 

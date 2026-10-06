@@ -107,8 +107,6 @@ another module's internals.
   * `POST /api/download/burst-pack` — download the Burst Pack zip
   * `GET /api/subreports` — list detected drill-through children
   * `POST /api/subreport/<child>/upload|clear|build` — manage a child report
-  * `GET /api/ai/status`, `GET /api/ai/test`, `POST /api/auto-fix`,
-    `POST /api/apply-fix` — optional Claude assist
   * `GET /api/recent/clear` — reset the in-memory recent-conversion cache
   * `GET /api/health` — health/sample-list probe
 
@@ -321,7 +319,7 @@ Three independent validators, all returning issues in the shape
 * `layout_audit.py` — a data-independent geometry auditor that flags
   clipping and overflow risk before any data is bound; its findings merge
   into the preflight issue list as AMBER.
-* `fidelity.py` — scores source→RDL coverage (see 3.18) and is the other
+* `fidelity.py` — scores source→RDL coverage (see 3.17) and is the other
   half of the honesty contract: the verdict says "can this deploy?", the
   fidelity report says "did anything quietly go missing?"
 
@@ -410,24 +408,15 @@ file to running on a real SSRS server.
 * `audit.py` — structured per-rewrite audit trail (input snippet, output
   snippet, rule name, severity, source location).
 * `bundle_export.py` — builds the full conversion bundle zip (RDL,
-  validation report, deploy checklist, audit trail, AI prompts, burst
-  pack, README).
+  validation report, deploy checklist, audit trail, burst pack,
+  README).
 * `cache.py` — SHA-256 memoize layer so re-running on identical bytes is
   instant.
 * `compare.py` — two-report diff + complexity delta for the Compare modal.
 * `artifact_enrich.py` — enriches the parsed report with hints derived
   from supporting artifacts.
 
-### 3.16 `backend/converter/ai_assist.py`, `ai_apply.py`, `ai_runner.py`
-
-* `ai_assist.py` — builds paste-into-LLM prompt templates for tricky
-  PL/SQL the deterministic translator can't handle.
-* `ai_apply.py` — applies one pasted UDF body back into the RDL.
-* `ai_runner.py` — when `ANTHROPIC_API_KEY` is set, calls Claude directly
-  for every prompt, validates each result (no `DROP`/`EXEC`/etc.), and
-  patches the RDL in place.
-
-### 3.17 `backend/converter/rdl_postprocess.py`
+### 3.16 `backend/converter/rdl_postprocess.py`
 
 Post-processing helpers that run on the generated RDL string:
 
@@ -442,7 +431,7 @@ Post-processing helpers that run on the generated RDL string:
 The shared-reference shape itself (and *why* it is load-bearing) is
 documented in `CONVERSION_NOTES.md`.
 
-### 3.18 `backend/converter/fidelity.py`
+### 3.17 `backend/converter/fidelity.py`
 
 `fidelity.py` is the converter's self-check: it parses the **generated**
 RDL back and compares it to the parsed Oracle source, scoring how faithful
@@ -452,7 +441,7 @@ XSD/preflight gates answer "will it upload?", this answers "is it a 1:1
 copy?". Generic and structural — no per-report logic. Surfaced in the UI's
 Extras card.
 
-### 3.19 `backend/converter/batch.py` and `licensing.py`
+### 3.18 `backend/converter/batch.py` and `licensing.py`
 
 * `batch.py` — converts many Oracle reports in one pass and produces a
   **Migration Assessment**: a per-report verdict table (upload-readiness,
@@ -467,12 +456,12 @@ Extras card.
   branding. The converter core is fully functional in every edition and
   single-report conversion is always unlimited; there is no phone-home.
 
-### 3.20 `backend/db/seed_sample_db.py` and `backend/db/sample.sqlite`
+### 3.19 `backend/db/seed_sample_db.py` and `backend/db/sample.sqlite`
 
 Bundled SQLite sample DB seeded with synthetic data so the Live Data tab
 returns real rows with zero database setup.
 
-### 3.21 `tools/renderlab/` — Microsoft-engine render verification
+### 3.20 `tools/renderlab/` — Microsoft-engine render verification
 
 A standalone harness (not in the request path) that renders a generated
 RDL through **Microsoft's ReportViewer engine** to a real PDF and measures
@@ -483,7 +472,7 @@ is blocked by an OS Application Control policy, a signed-DLL PowerShell
 fallback (`render_rdl.ps1`) that staticizes expressions and still drives the
 real engine. See `tools/renderlab/README.md`.
 
-### 3.22 `frontend/templates/index.html` + `frontend/static/`
+### 3.21 `frontend/templates/index.html` + `frontend/static/`
 
 Single-page, vanilla-JS frontend. The UI surfaces **four main tabs** by
 default (HTML Mockup, RDL XML, Bursting, Sub-Reports) with the other
@@ -504,7 +493,7 @@ This means:
 * You can swap the parser implementation as long as it returns a `ParsedReport`.
 * You can add new generators (CSV, Power BI, Crystal) without touching the
   parser or the translator.
-* You can add new translators (an LLM-assisted one, a DB2 target, etc.) by
+* You can add new translators (a DB2 target, a PostgreSQL target, etc.) by
   consuming the same `DataQuery.sql` and writing back into `q.tsql`.
 
 ---
@@ -632,11 +621,6 @@ before the migrated report goes live.
 Because every module reads and writes the same `ParsedReport`, the pipeline
 is extended by adding a function, not by editing existing modules.
 
-* **AI-assist module.** `ai_assist.py` builds a paste-into-LLM prompt for
-  PL/SQL the deterministic translator could not handle. `ai_runner.py` does
-  the same automatically when `ANTHROPIC_API_KEY` is set: it calls Claude,
-  validates each result (rejecting `DROP`/`EXEC`/etc.), and patches the RDL
-  in place.
 * **Custom UDF stubs.** `translators/udf_stubs.py` keeps its known mappings
   in the `_KNOWN_STUBS` dict. Adding a new `dbo.fn_*` mapping is a
   dict-entry edit.

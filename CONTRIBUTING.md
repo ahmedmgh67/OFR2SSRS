@@ -43,8 +43,8 @@ your development environment, run the test suite, and submit a pull request.
    than a `ModuleNotFoundError` traceback.
 
    The dependency surface is intentionally small: Flask, lxml, python-docx,
-   the Anthropic SDK (for the optional Claude assist), and pytest + pypdf for
-   the test/render-verification path. Python 3.9 or newer is required.
+   python-dotenv, PyMuPDF, and pytest + pypdf for the test/render-verification
+   path. Python 3.9 or newer is required.
 
 ## Running tests
 

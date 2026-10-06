@@ -76,7 +76,7 @@ machine.
 | **Live data** | Runs the report's real queries against your database (connection string in the sidebar); parameter inputs + row grid. | Prove the SQL returns the right rows *before* the report server is involved. |
 | **Validation** | The full pre-flight audit behind the verdict banner; every finding says what happens at run time and what to do. | Triage before deployment. BLOCKER = won't work, RED = wrong output, AMBER = check, READY = deploy. |
 | **Deployment** | The go-live checklist: shared data source, upload steps, why you skip Refresh Fields, download buttons. | Every deployment, until it's muscle memory. |
-| **Extras** | Fidelity scorecard (nothing silently lost), conversion audit trail, copy-paste AI prompts. | Deep dives and second opinions. |
+| **Extras** | Fidelity scorecard (nothing silently lost), conversion audit trail. | Deep dives. |
 | **Bursting** | One rendered file per key (Oracle `distribute=YES`): the Burst Pack — filtered RDL + key-list RDL + `Run-Burst.ps1` driver — replaces Oracle distribution on any SSRS edition. | Letter/invoice/permit runs that produce one file per record. |
 | **Sub-reports** | Auto-detected child reports (envelopes, detail pages) with a dropzone to convert each through the same pipeline. | Reports whose rows drill through to another report. |
 

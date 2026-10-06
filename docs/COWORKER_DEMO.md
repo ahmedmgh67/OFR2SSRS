@@ -148,10 +148,8 @@ Click the **Advanced views** toggle to expose the rest of the tabs.
   list. Items marked `auto` the converter already did. `todo` is what
   you have to do and we tell you exactly how. `caution` is a known
   footgun. `manual` is UI work nothing can automate."
-- **Extras.** "Translation audit trail, AI prompt templates, and — if
-  you set an Anthropic API key in `.env` — a button that calls Claude
-  on every prompt automatically and patches the results back into the
-  RDL."
+- **Extras.** "Fidelity scorecard and the translation audit trail —
+  every decision the converter made, with the text before and after."
 
 ### Beat 8: download and open in Report Builder (45 seconds)
 
@@ -217,7 +215,7 @@ Mention these in passing:
 
 * The whole pipeline is **decoupled** behind one `ParsedReport` dataclass.
   Adding a new generator (CSV, Power BI, Crystal) means writing one
-  function. Adding a new translator (LLM-assisted, DB2-target) means
+  function. Adding a new translator (DB2-target, PostgreSQL-target) means
   writing one function.
 * **PL/SQL formula columns are actually compiled**, not hand-waved. A real
   tokenizer + parser turns a `CF_*` / `CP_*` formula into an SSRS VB.NET
@@ -230,7 +228,7 @@ Mention these in passing:
   we measure for page count and blank pages. The test suite is **1,377
   passed, 0 failed** (20 environment-gated skips).
 * It is **offline by default**. No SaaS, no telemetry, no API keys
-  required. Optional Claude assist is opt-in via `.env`.
+  required.
 * The frontend is **vanilla JS** with no build step. You can clone and
   run it in 60 seconds on a fresh laptop.
 

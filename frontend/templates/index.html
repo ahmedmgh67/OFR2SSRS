@@ -690,16 +690,14 @@
         </div>
       </div>
 
-      <!-- Tab: Extras (audit trail, AI prompts, bursting / DDS) -->
+      <!-- Tab: Extras (audit trail, bursting / DDS) -->
       <div id="tab-extras" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-extras" tabindex="0" hidden>
         <div class="panel-card">
           <div class="panel-toolbar">
             <h2 class="panel-title">Extras</h2>
           </div>
           <p class="panel-intro">How much of the original report came across,
-            a record of the decisions this tool made while converting, and
-            ready-made questions you can paste into an AI tool if you want a
-            second opinion on a query or a formula.</p>
+            and a record of the decisions this tool made while converting.</p>
           <div id="extras-host" class="extras-host"></div>
         </div>
       </div>
@@ -719,8 +717,6 @@
 <script src="{{ url_for('static', filename='js/highlight.js') }}?v={{ asset_version }}"></script>
 <script src="{{ url_for('static', filename='js/app.js') }}?v={{ asset_version }}"></script>
 <script src="{{ url_for('static', filename='js/demo_mode.js') }}?v={{ asset_version }}"></script>
-<script src="{{ url_for('static', filename='js/ai_apply.js') }}?v={{ asset_version }}"></script>
-<script src="{{ url_for('static', filename='js/ai_auto.js') }}?v={{ asset_version }}"></script>
 <!-- Wide content (RDL XML, generated SQL, tables, rendered pages) scrolls in
      its own box at 320px and at 200% zoom; this makes that box reachable by
      keyboard. See the REFLOW LAYER in style.css. -->

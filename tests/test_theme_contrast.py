@@ -92,7 +92,7 @@ SURFACES = {
                       ("text", "ring")),
 
     # ---- tinted strips that hold copy AND controls ---------------------
-    "--accent-wash": _s(".mockup-cta-bar, .burst-callout, .o2s-ai-auto-bar,"
+    "--accent-wash": _s(".mockup-cta-bar, .burst-callout,"
                         " .tab-badge, ::selection", ("text", "ring")),
     "--good-wash": _s(".preflight-banner.ok, .deploy-status.ds-ready,"
                       " .pill.good", ("text", "ring")),
@@ -266,7 +266,7 @@ PAIRS = [
     # a focusable control sits on each of these too -- .cta-btn on the CTA
     # bar, .ds-btn on a deploy strip, and a listing that scrolls sideways is
     # itself a tab stop whose ring is drawn INSIDE the well.
-    ("--focus-ring", "--accent-wash", UI, "focus ring on .mockup-cta-bar / the AI bar"),
+    ("--focus-ring", "--accent-wash", UI, "focus ring on .mockup-cta-bar"),
     ("--focus-ring", "--good-wash", UI, "focus ring on a READY deploy strip"),
     ("--focus-ring", "--warn-wash", UI, "focus ring on .cta-fix-first"),
     ("--focus-ring", "--bad-wash", UI, "focus ring on a BLOCKER strip"),

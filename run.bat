@@ -8,7 +8,7 @@ REM setup is never done implicitly. If a required package is missing, the
 REM app's own import error names it, and the ONE optional command is:
 REM     python -m pip install -r requirements.txt
 
-REM Load .env if present (for ANTHROPIC_API_KEY etc.)
+REM Load .env if present (for O2S_* settings)
 REM (eol=# skips comment lines natively. The previous form used a substring
 REM  expression on a FOR variable, which batch does not support, so any
 REM  machine that HAD a .env died with "The syntax of the command is

@@ -292,11 +292,9 @@
         "report server address in the panel on the left and they go into " +
         "every file you download.");
 
-      await next(clickTab("extras"), "Extras — coverage and second opinions",
+      await next(clickTab("extras"), "Extras — coverage and decisions",
         "How much of the original came across and what still needs a " +
-        "person, a record of the decisions made while converting, and " +
-        "ready-made questions you can paste into your own AI tool if you " +
-        "want a second opinion on a query or a formula.");
+        "person, and a record of the decisions made while converting.");
 
       // The Bursting and Sub-Reports tabs are STRUCTURE-DRIVEN: each is a
       // main tab only when the converted report carries its signal, and

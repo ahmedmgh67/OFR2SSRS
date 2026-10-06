@@ -5,7 +5,7 @@ it can only ever *approximate* the report and every discrepancy has to be
 chased by hand. The RDL run through Microsoft's own ReportViewer engine is
 not an approximation -- it is the thing SSRS will print. Rasterising that
 render gives a preview that cannot disagree with the deliverable, and gives
-a human (or Claude) an image to actually LOOK at instead of a metric to
+a human an image to actually LOOK at instead of a metric to
 trust.
 
     from rdl_preview import preview_pages

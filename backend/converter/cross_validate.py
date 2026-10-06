@@ -6,7 +6,7 @@ The point: catch parser drift / missing queries / unexpected page counts
 BEFORE the user trusts the conversion. Every check produces a structured
 finding with severity (info/warning/error) so the UI can render them.
 
-This module is purely deterministic — no LLM, no network. Re-running on the
+This module is purely deterministic — no network. Re-running on the
 same inputs produces the same output every time.
 
 Public API:

@@ -253,9 +253,6 @@ _allow(_SUB,
 _allow(_SUB,
        ("WHERE", "AND", "OR"),
        "SQL keywords - fixed by the SQL language.")
-_allow("backend/converter/ai_apply.py",
-       ("DROP", "TRUNCATE", "EXEC", "EXECUTE", "xp_", "sp_executesql"),
-       "SQL / T-SQL DDL + procedure keywords blocked by the injection guard.")
 _allow("backend/converter/burst_pack.py",
        ("PDF", "EXCELOPENXML", "WORDOPENXML", "EXCEL", "WORD", "CSV", "XML", "MHTML", "IMAGE"),
        "SSRS rendering-extension names (rs:Format values) - fixed by Reporting "

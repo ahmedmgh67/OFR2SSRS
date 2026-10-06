@@ -13,7 +13,7 @@ from html import unescape as _unescape
 from pathlib import Path
 
 # Load .env from project root, BEFORE importing converter modules.
-# This way the key is in os.environ no matter how Flask was launched.
+# This way O2S_* settings are in os.environ no matter how Flask was launched.
 try:
     from dotenv import load_dotenv
     from pathlib import Path as _Path
@@ -136,8 +136,6 @@ ERROR_KINDS = {
     "nothing_selected",       # no file part at all
     "render_engine_unavailable",   # the RDL is fine, the engine is not
     "image_rejected",         # not an image / too big
-    "ai_not_configured",      # optional AI helper is not set up
-    "validation_failed",      # the request was checked and refused
     "invalid_request",        # malformed / unusable request
     "server_error",           # unexpected exception
 }
@@ -1396,7 +1394,7 @@ def api_download_rdl():
     rdl = _last().get("rdl_xml") or ""
     if not rdl:
         abort(404)
-    # Exit-point guarantee: whatever happened in between (AI fixes, etc.),
+    # Exit-point guarantee: whatever happened in between,
     # the artifact the user ships carries the session's data source binding.
     rdl = _apply_deploy_datasource(rdl, request)
     name = (_last().get("report") or {}).get("name") or "report"
@@ -1472,101 +1470,6 @@ def api_health():
         "max_upload_bytes": limit,
         "max_upload_mb": round(limit / (1024 * 1024), 2),
     })
-
-
-@app.get("/api/ai/test")
-def api_ai_test():
-    """One-shot test call to Anthropic to surface auth/model errors clearly."""
-    from converter.ai_runner import _call_claude, DEFAULT_MODEL, _api_key, is_configured
-    if not is_configured():
-        return jsonify({"ok": False, "error": "ai_not_configured",
-                        "error_kind": "ai_not_configured"}), 400
-    try:
-        out = _call_claude(
-            "Reply with only the word: hello",
-            api_key=_api_key(),
-            model=DEFAULT_MODEL,
-            max_tokens=20,
-        )
-        return jsonify({"ok": True, "model": DEFAULT_MODEL, "response": out[:200]})
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({
-            "ok": False,
-            "error_type": type(e).__name__,
-            "error": str(e)[:1000],
-            "error_kind": "server_error",
-            "model": DEFAULT_MODEL,
-        }), 500
-
-
-@app.get("/api/ai/status")
-def api_ai_status():
-    """Returns whether Auto-AI is configured (API key present + SDK installed)."""
-    from converter.ai_runner import is_configured, DEFAULT_MODEL
-    return jsonify({"configured": is_configured(), "model": DEFAULT_MODEL})
-
-
-@app.post("/api/auto-fix")
-def api_auto_fix():
-    """One-button: call Claude on every AI prompt, apply each valid result."""
-    data = _last()
-    if not data or not data.get("rdl_xml"):
-        return _err("no report converted yet", "no_report_yet", 400)
-    from converter.ai_runner import auto_fix, is_configured
-    if not is_configured():
-        return jsonify({
-            "error": "ai_not_configured",
-            "error_kind": "ai_not_configured",
-            "hint": "Set ANTHROPIC_API_KEY in your .env (see .env.example)."
-        }), 400
-    try:
-        updated = auto_fix(data)
-        if updated.get("rdl_xml"):
-            updated["rdl_xml"] = _apply_deploy_datasource(
-                updated["rdl_xml"], request)
-        _reconcile_checklist(updated)
-        _set_last(updated)
-        return jsonify({
-            "ok": True,
-            "summary": updated.get("ai_summary", {}),
-            "results": [
-                {"id": r.get("id"), "name": r.get("target", {}).get("name"),
-                 "ok": r.get("ok"), "applied": r.get("applied", False),
-                 "error": r.get("error")}
-                for r in updated.get("ai_results", [])
-            ],
-        })
-    except Exception as e:
-        traceback.print_exc()
-        return _crash(e)
-
-
-@app.post("/api/apply-fix")
-def api_apply_fix():
-    """Apply a pasted AI translation back into the most recent conversion."""
-    payload = request.get_json(silent=True) or {}
-    target = payload.get("target") or {}
-    body = payload.get("new_body") or ""
-    from converter.ai_apply import validate_udf_body, apply_fix
-    ok, issues = validate_udf_body(body, target.get("name"))
-    if not ok:
-        return jsonify({"error": "validation_failed",
-                        "error_kind": "validation_failed",
-                        "issues": issues}), 400
-    data = _last()
-    if not data or not data.get("rdl_xml"):
-        return _err("no report converted yet", "no_report_yet", 400)
-    try:
-        updated_rdl, info = apply_fix(data["rdl_xml"], target, body)
-        data["rdl_xml"] = _apply_deploy_datasource(updated_rdl, request)
-        _reconcile_checklist(data)
-        data.setdefault("applied_fixes", []).append({"target": target, "info": info})
-        _set_last(data)
-        return jsonify({"ok": True, "info": info, "warnings": issues})
-    except Exception as e:
-        traceback.print_exc()
-        return _crash(e)
 
 
 @app.get("/api/mockup/<variant>")

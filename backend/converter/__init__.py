@@ -25,7 +25,6 @@ from .deployment import build_checklist
 from .audit import build_audit_trail
 from .fidelity import build_fidelity_report
 from .fidelity import ATTENTION_THRESHOLD as _FIDELITY_ATTENTION
-from .ai_assist import build_prompts
 from .bursting import detect_bursting
 from .subreports import detect_subreport_links, is_drillthrough_only
 
@@ -414,13 +413,6 @@ def convert(xml_bytes: bytes, target_db: str = "oracle",
         fidelity_report = {"score": None, "summary": "",
                            "categories": {}, "needs_attention": [],
                            "error": f"{type(e).__name__}: {e}"}
-
-    # AI-assist prompts for tricky bits
-    ai_prompts = []
-    try:
-        ai_prompts = build_prompts(parsed)
-    except Exception as e:  # noqa: BLE001
-        ai_prompts = []
 
     # Sub-report (drill-through) detection. Surface to the frontend
     # so the Sub-Reports tab can list each detected link with a
@@ -897,7 +889,6 @@ def convert(xml_bytes: bytes, target_db: str = "oracle",
         "audit_trail": audit_trail,
         "fidelity_report": fidelity_report,
         "preflight": preflight,
-        "ai_prompts": ai_prompts,
         "bursting": bursting_info,
         "target_db": target_db,
         "subreport_links": subreport_links,

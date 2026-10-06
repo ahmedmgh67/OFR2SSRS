@@ -891,34 +891,6 @@ def test_image_slot_rows_are_full_size_targets(converted):
     converted.evaluate("() => renderImageSlots({image_slots: []})")
 
 
-def test_a_closed_disclosure_keeps_its_fields_off_the_keyboard(converted):
-    """The Extras tab hangs long editable prompts off <details>. Closed,
-    their textareas must be out of the tab order (or Tab crawls through
-    seventeen invisible text boxes); opening the summary must put them
-    back. This is the contract that lets the focus walk finish at all."""
-    converted.click('[data-tab="extras"]')
-    converted.wait_for_timeout(400)
-    state = converted.evaluate("""() => {
-      const d = document.querySelector('.extras-prompt');
-      if (!d) return null;
-      const ta = d.querySelector('textarea');
-      if (!ta) return null;
-      const before = (() => { ta.focus(); return document.activeElement === ta; })();
-      d.open = true;
-      const after = (() => { ta.focus(); return document.activeElement === ta; })();
-      d.open = false;
-      return {closedFocusable: before, openFocusable: after};
-    }""")
-    if state is None:
-        pytest.skip("this report produced no <details> prompt blocks")
-    assert not state["closedFocusable"], (
-        "a field inside a CLOSED disclosure took focus: the keyboard has to "
-        "walk through content nobody can see")
-    assert state["openFocusable"], (
-        "opening the disclosure did not make its field focusable, so its "
-        "content is unreachable by keyboard")
-
-
 # ---------------------------------------------------------------- contrast
 def _srgb(component):
     c = component / 255.0

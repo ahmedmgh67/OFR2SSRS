@@ -456,9 +456,6 @@ const NEXT_ACTION_BY_KIND = {
   image_rejected:
     "Check the file is a PNG, GIF or JPG and small enough, then add it "
     + "again. The report itself was not changed.",
-  ai_not_configured:
-    "This step needs the optional AI helper, which is not set up on this "
-    + "machine. Nothing else depends on it — carry on with the conversion.",
   nothing_selected:
     "Choose the files above first, then press the button again.",
   invalid_request:
@@ -469,8 +466,6 @@ const NEXT_ACTION_BY_KIND = {
     + "The same file will fail the same way until it is fixed, so copy the "
     + "wording above together with the report name and send it to whoever "
     + "installed this tool.",
-  validation_failed:
-    "Open the Validation view, fix what it lists, then run this step again.",
 };
 const NEXT_ACTION_UNKNOWN =
   "Try the same step again. If it fails the same way, copy the wording "
@@ -484,7 +479,7 @@ function _nextActionFor(kind) {
     ? NEXT_ACTION_BY_KIND[k] : NEXT_ACTION_UNKNOWN;
 }
 
-// Other files (the guided tour, the AI helpers) get the same surface rather
+// Other files (the guided tour) get the same surface rather
 // than inventing their own transient one.
 window.o2sStatus = {
   begin: statusBegin, progress: statusProgress, done: statusDone,
@@ -927,7 +922,7 @@ function _appHowtoHTML() {
       '<tr><th scope="row"><b>Live Data</b></th><td>Runs the report&rsquo;s SQL against a small read-only <b>sample database</b> that ships with this tool, to prove the SQL is valid and runs. Tables the sample database does not have come back empty. It does <b>not</b> touch your database. The connection you type on the left is baked into the downloaded RDL for the server to use later; it is not used here.</td></tr>' +
       '<tr><th scope="row"><b>Validation</b></th><td>Every check this tool ran, with what will happen at run time and what to do. See &ldquo;Reading the verdict&rdquo; above for what BLOCKER, RED, AMBER and READY mean.</td></tr>' +
       '<tr><th scope="row"><b>Deploy Checklist</b></th><td>The steps for going live, in order: where the data source goes, how to upload, and why you never click Refresh Fields. The download buttons are here too.</td></tr>' +
-      '<tr><th scope="row"><b>Extras</b></th><td>How much of the original came across, a record of the decisions made while converting, and ready-made questions you can paste into an AI tool for a second opinion.</td></tr>' +
+      '<tr><th scope="row"><b>Extras</b></th><td>How much of the original came across, and a record of the decisions made while converting.</td></tr>' +
       '<tr><th scope="row"><b>Bursting</b></th><td>One run, one PDF per recipient, emailed automatically. This is what replaces Oracle&rsquo;s <code>distribute=YES</code>.</td></tr>' +
       '<tr><th scope="row"><b>Sub-Reports</b></th><td>The reports this one links to, such as envelopes or detail pages. Drop a sub-report&rsquo;s files here to build it; the links in the main report then work once both are on your server.</td></tr>' +
       '</tbody></table>' +
@@ -3327,7 +3322,7 @@ function renderFidelityCard(host, fid, preflight) {
   host.appendChild(section);
 }
 
-// ----- Tab 7: Extras (audit trail, AI prompts, bursting / DDS) - advanced -----
+// ----- Tab 7: Extras (audit trail, bursting / DDS) - advanced -----
 function renderExtrasTab(data) {
   const host = document.getElementById("extras-host");
   if (!host) return;
@@ -3366,30 +3361,6 @@ function renderExtrasTab(data) {
   }
   host.appendChild(burstSection);
 
-  // Compact card: AI-assist prompts
-  const prompts = data.ai_prompts || [];
-  const promptSection = document.createElement("section");
-  promptSection.className = "extras-section extras-compact";
-  promptSection.innerHTML =
-    "<h3>Questions you can paste into an AI tool (" + prompts.length + ")</h3>" +
-    "<p class='panel-intro'>Ready-made questions about this report's queries " +
-    "and formulas. Copy one into whichever AI tool you already use if you " +
-    "want a second opinion. Nothing is sent anywhere by this tool.</p>";
-  prompts.forEach((p, idx) => {
-    const card = document.createElement("details");
-    card.className = "extras-prompt diff-" + (p.difficulty || "medium");
-    card.innerHTML =
-      "<summary>" +
-      "<span class='extras-tag'>" + escapeHtml(p.scope || "") + "</span> " +
-      "<b>" + escapeHtml(p.name || ("prompt #" + (idx+1))) + "</b>" +
-      " <span class='extras-difficulty'>" + escapeHtml(p.difficulty || "medium") + "</span>" +
-      " <button class='btn btn-ghost btn-copy' data-copy-prompt='" + idx + "'>Copy</button>" +
-      "</summary>" +
-      "<pre class='code-block'><code>" + escapeHtml(p.prompt_template || "") + "</code></pre>";
-    promptSection.appendChild(card);
-  });
-  host.appendChild(promptSection);
-
   // Compact card: Audit trail
   const trail = data.audit_trail || [];
   const auditSection = document.createElement("section");
@@ -3426,10 +3397,8 @@ function renderExtrasTab(data) {
     btn.addEventListener("click", (e) => {
       e.preventDefault(); e.stopPropagation();
       const key = btn.dataset.copy;
-      const promptIdx = btn.dataset.copyPrompt;
       let text = "";
       if (key && data.bursting && data.bursting[key]) text = data.bursting[key];
-      else if (promptIdx != null && data.ai_prompts && data.ai_prompts[+promptIdx]) text = data.ai_prompts[+promptIdx].prompt_template || "";
       if (!text) return;
       navigator.clipboard.writeText(text).then(
         () => toast("Copied", "ok"),
@@ -3438,8 +3407,8 @@ function renderExtrasTab(data) {
     });
   });
 
-  // Set badge: count items needing attention (= AI prompts > 0 OR bursting detected)
-  const extrasCount = prompts.length + (burst.is_bursting ? 1 : 0);
+  // Set badge: count items needing attention (= bursting detected)
+  const extrasCount = burst.is_bursting ? 1 : 0;
   setBadge("badge-extras", extrasCount);
 }
 

@@ -70,8 +70,5 @@ _scratch_run.py
 # terms that must never appear in this public repo, so it NEVER ships.
 .canary_local
 
-# Local-only worktree artifacts
-.claude/worktrees/
-
-# Claude Code per-machine settings (leaks local username/paths + allowlist)
-.claude/settings.local.json
+# Local editor/assistant tooling (per-machine, never ships)
+.claude/

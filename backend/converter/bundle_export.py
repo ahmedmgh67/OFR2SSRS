@@ -12,7 +12,7 @@ from __future__ import annotations
 import io
 import json
 import zipfile
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List
 
 
@@ -136,7 +136,7 @@ def _readme_md(data: Dict[str, Any], file_list: List[str]) -> str:
     lines: List[str] = []
     lines.append(f"# {name} – Conversion Bundle")
     lines.append("")
-    lines.append(f"_Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC by Oracle2SSRS._")
+    lines.append(f"_Generated {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC by Oracle2SSRS._")
     lines.append("")
     lines.append("This zip contains every artifact the Oracle Reports -> SSRS converter")
     lines.append("produced for this run.  Hand it to the SSRS developer and they have")

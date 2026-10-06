@@ -80,7 +80,7 @@ def test_every_parameter_has_default_value(xml_name, xml_path):
     not just SAMPLE_DRILLTHROUGH."""
     from converter import convert
     try:
-        rdl = convert(open(xml_path, "rb").read())["rdl_xml"]
+        rdl = convert(Path(xml_path).read_bytes())["rdl_xml"]
     except Exception as e:
         pytest.skip(f"convert raised {type(e).__name__}: {e}")
     missing = _params_without_defaults(rdl)

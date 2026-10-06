@@ -156,7 +156,7 @@ def test_uploaded_xml_tablix_alignment(xml_name, xml_path):
     not just the curated fixtures."""
     from converter import convert
     try:
-        rdl = convert(open(xml_path, "rb").read())["rdl_xml"]
+        rdl = convert(Path(xml_path).read_bytes())["rdl_xml"]
     except Exception as e:
         pytest.skip(f"convert raised {type(e).__name__}: {e}")
     root = ET.fromstring(rdl)

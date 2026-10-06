@@ -406,7 +406,8 @@ def _sql_from_artifact(path: str) -> str:
     name = path.lower()
     if name.endswith(".sql") or name.endswith(".txt"):
         try:
-            return open(path, "r", encoding="utf-8", errors="replace").read()
+            with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                return fh.read()
         except Exception:
             return ""
     if name.endswith(".docx"):

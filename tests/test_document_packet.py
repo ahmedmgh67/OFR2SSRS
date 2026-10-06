@@ -8,6 +8,7 @@ inputs, so no client data lands in the public repo.
 """
 import os
 import re
+from pathlib import Path
 
 from backend.converter import convert
 from backend.converter.parsers.oracle_xml import parse_oracle_xml
@@ -59,7 +60,7 @@ def test_packet_renders_three_pages_with_tiled_table():
 def test_packet_does_not_fabricate_a_run_info_cover():
     # The tabular template invents a "Run By / Total of ALL Records" cover; a
     # packet must render its real memo/letter prose instead.
-    res = convert(open(FIXTURE, "rb").read())
+    res = convert(Path(FIXTURE).read_bytes())
     assert res["conversion_error"] is None
     assert res["fidelity_report"]["score"] == 1.0
     assert "Total of ALL Records" not in res["mockup_html"]
@@ -72,7 +73,7 @@ def test_packet_rdl_keeps_all_sections_and_paginates():
     frames) -- and carry a PageBreak for each pageBreakAfter frame. STRUCTURAL
     ONLY: the SSRS render engine is blocked in this environment, so the exact
     pagination is confirmed by uploading the .rdl, not asserted here."""
-    res = convert(open(FIXTURE, "rb").read())
+    res = convert(Path(FIXTURE).read_bytes())
     rdl = res["rdl_xml"]
     assert res["conversion_error"] is None
     errs = [i for i in (res.get("rdl_issues") or []) if i.get("severity") == "error"]

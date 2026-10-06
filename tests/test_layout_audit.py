@@ -8,6 +8,8 @@ dropped the wallet-card expiration date and clips multi-line letter bodies.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from converter.validators.layout_audit import audit_layout
 
 NS = "http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition"
@@ -92,7 +94,7 @@ def test_convert_surfaces_layout_flags_as_amber(monkeypatch):
         lambda _rdl: [{"rule": "layout.height_overflow",
                        "severity": "warning", "message": "Box_X clips"}],
     )
-    src = open("tests/fixtures/source_of_truth/letter/source.xml", "rb").read()
+    src = Path("tests/fixtures/source_of_truth/letter/source.xml").read_bytes()
     pf = converter.convert(src)["preflight"]
     amber = [i for i in pf["issues"] if i.get("rule") == "layout.height_overflow"]
     assert amber, "layout flag did not surface in preflight.issues"

@@ -1,15 +1,14 @@
-Flask>=3.0.0
-lxml>=5.0.0
-python-docx>=1.1.0
-Werkzeug>=3.0.0
-pytest>=7.0.0
-anthropic>=0.40.0
-python-dotenv>=1.0.0
+Flask>=3.1.3
+lxml>=6.1.3
+python-docx>=1.2.0
+Werkzeug>=3.1.9
+pytest>=9.1.1
+python-dotenv>=1.2.4
 # Used by the batch Migration Assessment's --render measurement step and the
 # RenderLab verification tests (both degrade gracefully without it, but it
 # should work out of the box).
-pypdf>=3.0.0
+pypdf>=6.19.0
 # Rasterises the engine-rendered PDF into the Preview tab's page images
-# (import name: fitz). Without it the preview falls back to embedding the
+# (import name: pymupdf). Without it the preview falls back to embedding the
 # PDF itself — the feature still works, just without per-page PNGs.
-PyMuPDF>=1.24.0
+PyMuPDF>=1.28.2

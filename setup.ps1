@@ -20,7 +20,7 @@ Set-Location $ScriptDir
 Write-Hdr "Oracle2SSRS Setup"
 
 # ---------------------------------------------------------------------------
-# 1. Detect Python 3.9+
+# 1. Detect Python 3.10+
 # ---------------------------------------------------------------------------
 Write-Hdr "Step 1/6: Detecting Python"
 
@@ -41,7 +41,7 @@ foreach ($candidate in @('python', 'python3', 'py')) {
 
 if (-not $Python) {
     Write-Fail "No Python interpreter found on PATH."
-    Write-Warn2 "Install Python 3.9+ from https://www.python.org/downloads/"
+    Write-Warn2 "Install Python 3.10+ from https://www.python.org/downloads/"
     Write-Warn2 "Be sure to check 'Add Python to PATH' during installation."
     exit 1
 }
@@ -49,8 +49,8 @@ if (-not $Python) {
 $verParts = $PyVersion.Split('.')
 $major = [int]$verParts[0]
 $minor = [int]$verParts[1]
-if ($major -lt 3 -or ($major -eq 3 -and $minor -lt 9)) {
-    Write-Warn2 "Python $PyVersion detected. This project recommends Python 3.9+."
+if ($major -lt 3 -or ($major -eq 3 -and $minor -lt 10)) {
+    Write-Warn2 "Python $PyVersion detected. This project recommends Python 3.10+."
     Write-Warn2 "Continuing anyway; some features may not work."
 } else {
     Write-Ok "Python $PyVersion found ($Python)."

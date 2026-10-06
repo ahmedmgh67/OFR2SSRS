@@ -91,7 +91,7 @@ python -m pip install -r requirements.txt      <- the one-time fix
 
 Then open <http://127.0.0.1:5057> and drop an Oracle Reports artifact on the
 page. Override the listen port with `PORT=8080 ./run.sh`. Requires
-Python 3.9+.
+Python 3.10+.
 
 To install into a virtualenv instead:
 

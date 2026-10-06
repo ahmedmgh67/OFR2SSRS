@@ -44,7 +44,7 @@ your development environment, run the test suite, and submit a pull request.
 
    The dependency surface is intentionally small: Flask, lxml, python-docx,
    python-dotenv, PyMuPDF, and pytest + pypdf for the test/render-verification
-   path. Python 3.9 or newer is required.
+   path. Python 3.10 or newer is required.
 
 ## Running tests
 

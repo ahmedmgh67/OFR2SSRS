@@ -26,11 +26,11 @@ cd "$(dirname "$0")"
 hdr "Oracle2SSRS Setup"
 
 # ----------------------------------------------------------------------
-# 1. Detect Python 3.9+
+# 1. Detect Python 3.10+
 # ----------------------------------------------------------------------
 hdr "Step 1/6: Detecting Python"
 PYTHON=""
-for candidate in python3 python python3.13 python3.12 python3.11 python3.10 python3.9; do
+for candidate in python3 python python3.14 python3.13 python3.12 python3.11 python3.10; do
     if command -v "$candidate" >/dev/null 2>&1; then
         PYTHON="$candidate"
         break
@@ -39,7 +39,7 @@ done
 
 if [ -z "$PYTHON" ]; then
     fail "No Python interpreter found on PATH."
-    warn "Please install Python 3.9 or newer from https://www.python.org/downloads/"
+    warn "Please install Python 3.10 or newer from https://www.python.org/downloads/"
     exit 1
 fi
 
@@ -47,8 +47,8 @@ PY_VERSION=$("$PYTHON" -c 'import sys; print("%d.%d" % sys.version_info[:2])')
 PY_MAJOR=$("$PYTHON" -c 'import sys; print(sys.version_info[0])')
 PY_MINOR=$("$PYTHON" -c 'import sys; print(sys.version_info[1])')
 
-if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 9 ]; }; then
-    warn "Python ${PY_VERSION} detected. This project recommends Python 3.9+."
+if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 10 ]; }; then
+    warn "Python ${PY_VERSION} detected. This project recommends Python 3.10+."
     warn "Continuing anyway; some features may not work."
 else
     ok "Python ${PY_VERSION} found ($PYTHON)."

@@ -252,7 +252,7 @@ def test_a_child_that_declares_its_own_fill_still_paints_it():
 
 def _fill_inventory(pdf_path, rgb, tol=0.01):
     """Every filled rect of one colour: (x0, y0, x1, y1), page 1."""
-    import fitz
+    import pymupdf as fitz
     doc = fitz.open(str(pdf_path))
     out = []
     for d in doc[0].get_drawings():
@@ -272,7 +272,7 @@ def _fill_inventory(pdf_path, rgb, tol=0.01):
 
 def test_engine_paints_one_band_per_row_at_the_declared_extents(tmp_path):
     try:
-        import fitz  # noqa: F401
+        import pymupdf as fitz  # noqa: F401
         from render import render_rdl, lib_ready
     except Exception:  # noqa: BLE001
         pytest.skip("renderlab not available")

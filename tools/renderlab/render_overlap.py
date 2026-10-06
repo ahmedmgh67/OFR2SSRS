@@ -92,7 +92,7 @@ def _buried_text(page, max_hits: int = 8):
         bbox = span.get("bbox")
         if not bbox:
             continue
-        import fitz
+        import pymupdf as fitz
         sb = fitz.Rect(bbox)
         if sb.is_empty or sb.width <= 0 or sb.height <= 0:
             continue
@@ -204,7 +204,7 @@ def _opaque_fills(page):
 def _rule_is_covered(seg, fills) -> bool:
     """True when a LATER opaque fill paints over (essentially all of) the
     rule — it never reaches the paper, so it cuts nothing."""
-    import fitz
+    import pymupdf as fitz
 
     x0, y0, x1, y1, seq = seg
     sr = fitz.Rect(min(x0, x1) - 0.1, min(y0, y1) - 0.1,
@@ -300,7 +300,7 @@ def stroke_through_text(pdf_path: str | Path,
                         max_per_page: int = 8) -> list[dict]:
     """Standalone view of the rule-through-glyph class (same hits the full
     ``pdf_overlaps`` gate reports, without the text-vs-text pairs)."""
-    import fitz
+    import pymupdf as fitz
 
     out: list[dict] = []
     with fitz.open(str(pdf_path)) as doc:
@@ -314,7 +314,7 @@ def stroke_through_text(pdf_path: str | Path,
 def pdf_overlaps(pdf_path: str | Path, max_per_page: int = 8) -> list[dict]:
     """Return painted-over word pairs, buried-under-fill text AND drawn
     rules cutting through glyph ink, found in a rendered PDF."""
-    import fitz
+    import pymupdf as fitz
 
     out: list[dict] = []
     with fitz.open(str(pdf_path)) as doc:
@@ -352,7 +352,7 @@ def rdl_overlaps(rdl_xml: str, rows: int = 3) -> dict:
         if not res["ok"]:
             return {"ok": False, "overlaps": [], "pages": 0,
                     "log": res["log"][-400:]}
-        import fitz
+        import pymupdf as fitz
         with fitz.open(str(pdf)) as doc:
             pages = len(doc)
         return {"ok": True, "overlaps": pdf_overlaps(pdf), "pages": pages}

@@ -1019,7 +1019,7 @@ def _rendered_page_notes(pdf_path, count: int) -> list:
     """
     notes: list = []
     try:
-        import fitz
+        import pymupdf as fitz
         with fitz.open(str(pdf_path)) as doc:
             for i in range(min(count, doc.page_count)):
                 raw = doc[i].get_text("text") or ""
@@ -1124,14 +1124,14 @@ def api_render_preview():
                     "through your own SSRS instead")
         return _err(msg, "render_engine_unavailable", 503)
 
-    # Per-page PNGs need PyMuPDF (import name: fitz). It is a machine-local
+    # Per-page PNGs need PyMuPDF (import name: pymupdf). It is a machine-local
     # rasteriser, NOT part of the render itself -- so when it is absent the
     # preview must not die with a bare ModuleNotFoundError (that shipped
     # once: the feature worked on the machine it was built on and 500'd on
     # the next machine that pulled the repo). Fall back to returning the
     # rendered PDF itself, which every browser can display natively.
     try:
-        import fitz  # noqa: F401
+        import pymupdf as fitz  # noqa: F401
         have_fitz = True
     except ImportError:
         have_fitz = False

@@ -1273,7 +1273,7 @@ def test_the_page_reader_describes_a_page_and_refuses_garbled_text(tmp_path):
     ReportViewer embeds non-Latin font subsets with no usable ToUnicode, so
     extraction hands back glyph ids that have a length and print as tofu. A
     wrong description is worse than none."""
-    fitz = pytest.importorskip("fitz")
+    fitz = pytest.importorskip("pymupdf")
     import app as backend_app
     doc = fitz.open()
     first = doc.new_page()

@@ -111,7 +111,7 @@ def declared_chart_boxes(rdl_xml: str) -> list[dict]:
 
 def _ink(doc, xref: int) -> tuple[float, int]:
     """``(column coverage, dominant chromatic colours)`` of one image."""
-    import fitz
+    import pymupdf as fitz
 
     pix = fitz.Pixmap(doc, xref)
     if pix.n - pix.alpha > 3:            # CMYK / separation -> RGB
@@ -144,7 +144,7 @@ def chart_plots(pdf_path, rdl_xml: str) -> list[dict]:
     when the chart printed no image at its declared box, printed no spread of
     plotted ink, or printed fewer colours than it declares series.
     """
-    import fitz
+    import pymupdf as fitz
 
     boxes = declared_chart_boxes(rdl_xml)
     if not boxes:

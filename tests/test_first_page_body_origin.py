@@ -274,7 +274,7 @@ except Exception:  # noqa: BLE001
 @pytest.mark.skipif(not _LIB_OK or sys.platform != "win32",
                     reason="ReportViewer DLLs not fetched (tools/renderlab)")
 def test_rendered_page_one_shares_the_body_origin_with_later_pages(tmp_path):
-    import fitz  # PyMuPDF
+    import pymupdf as fitz  # PyMuPDF
     from rdl_preview import render_to_pdf
 
     rdl = convert(_record_xml())["rdl_xml"]

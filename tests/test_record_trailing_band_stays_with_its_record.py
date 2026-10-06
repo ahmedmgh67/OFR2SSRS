@@ -466,7 +466,7 @@ def test_the_collapsible_read_is_what_hands_the_paper_back(monkeypatch):
 # ------------------------------------------------------------ engine proof
 
 def _sheet_words(pdf):
-    import fitz
+    import pymupdf as fitz
     with fitz.open(str(pdf)) as doc:
         return [[w[4] for w in pg.get_text("words")] for pg in doc]
 

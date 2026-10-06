@@ -57,7 +57,7 @@ def render_to_pdf(rdl_xml: str, out_pdf: Path, rows: int = 3,
 def preview_pages(rdl_xml: str, out_dir: str | Path, rows: int = 3,
                   dpi: int = _DPI, max_pages: int = 12) -> list[Path]:
     """Render the RDL and return one PNG per page (empty list on failure)."""
-    import fitz  # PyMuPDF
+    import pymupdf as fitz  # PyMuPDF
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

@@ -61,7 +61,7 @@ def _draw_page(doc, *, rule=None, underline=False, border=False,
                buried=False, vrule=False):
     """One page carrying the word 'Ledger' at a known spot plus whichever
     decoration the case asks for. Coordinates are PDF points."""
-    import fitz
+    import pymupdf as fitz
 
     page = doc.new_page(width=300, height=120)
     x, baseline, size = 60.0, 60.0, 14.0
@@ -99,7 +99,7 @@ def _draw_page(doc, *, rule=None, underline=False, border=False,
 def _hits(**kw):
     import tempfile
 
-    fitz = pytest.importorskip("fitz")
+    fitz = pytest.importorskip("pymupdf")
     from render_overlap import stroke_through_text
 
     doc = fitz.open()
@@ -138,7 +138,7 @@ def test_stroke_hits_reach_the_paint_gate():
     — not just the standalone helper."""
     import tempfile
 
-    fitz = pytest.importorskip("fitz")
+    fitz = pytest.importorskip("pymupdf")
     from render_overlap import pdf_overlaps
 
     doc = fitz.open()

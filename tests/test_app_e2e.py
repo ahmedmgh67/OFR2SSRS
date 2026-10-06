@@ -335,7 +335,7 @@ def test_render_preview_returns_page_images_of_the_generated_rdl(client):
     root = pathlib.Path(__file__).resolve().parents[1]
     _sys.path.insert(0, str(root / "tools" / "renderlab"))
     try:
-        import fitz  # noqa: F401
+        import pymupdf as fitz  # noqa: F401
         from render import lib_ready
     except Exception:  # noqa: BLE001
         pytest.skip("renderlab not available")
@@ -414,7 +414,7 @@ def test_preview_frontend_is_the_real_render():
 def test_render_preview_falls_back_to_pdf_without_pymupdf(client, monkeypatch):
     """Missing PyMuPDF must degrade, never die.
 
-    The page-image rasteriser (import name: fitz) is a machine-local
+    The page-image rasteriser (import name: pymupdf) is a machine-local
     dependency; the first machine that pulled the repo without it got a
     bare ModuleNotFoundError 500 in place of a preview. Without fitz the
     endpoint returns the engine-rendered PDF itself (browsers display
@@ -436,8 +436,8 @@ def test_render_preview_falls_back_to_pdf_without_pymupdf(client, monkeypatch):
     if sample is None:
         pytest.skip("no sample report")
 
-    # make `import fitz` raise ImportError inside the endpoint
-    monkeypatch.setitem(_sys.modules, "fitz", None)
+    # make `import pymupdf as fitz` raise ImportError inside the endpoint
+    monkeypatch.setitem(_sys.modules, "pymupdf", None)
 
     client.post("/api/convert", data={
         "file": (io.BytesIO(sample.read_bytes()), sample.name)},
@@ -478,7 +478,7 @@ def test_local_render_never_depends_on_a_report_server(client):
     root = pathlib.Path(__file__).resolve().parents[1]
     _sys.path.insert(0, str(root / "tools" / "renderlab"))
     try:
-        import fitz  # noqa: F401
+        import pymupdf as fitz  # noqa: F401
         from render import lib_ready
     except Exception:  # noqa: BLE001
         pytest.skip("renderlab not available")

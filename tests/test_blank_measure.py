@@ -1710,7 +1710,7 @@ def test_mutation_assuming_a_white_ground_blinds_the_dark_sheet(
 def _one_page_pdf(tmp_path, text="Total measured this period 41205"):
     """A one-sheet PDF written by PyMuPDF itself, so these arms need no
     rendering engine and run on any machine that can measure ink at all."""
-    fitz = pytest.importorskip("fitz")
+    fitz = pytest.importorskip("pymupdf")
     doc = fitz.open()
     doc.new_page().insert_text((72, 72), text)
     path = tmp_path / "one.pdf"
@@ -1722,7 +1722,7 @@ def _one_page_pdf(tmp_path, text="Total measured this period 41205"):
 def _break_texttrace(monkeypatch):
     """Break the ink pass at its deepest point — the glyph reader rule (D) is
     built on."""
-    fitz = pytest.importorskip("fitz")
+    fitz = pytest.importorskip("pymupdf")
 
     def _boom(self, *a, **k):
         raise RuntimeError("texttrace unavailable")
@@ -1748,7 +1748,7 @@ def test_a_crashing_ink_pass_raises_instead_of_reporting_no_ink(
 def _break_page_dict(monkeypatch):
     """Break the ink pass at its OTHER reader — the one that supplies the
     lines, the raster marks and the decodable text."""
-    fitz = pytest.importorskip("fitz")
+    fitz = pytest.importorskip("pymupdf")
 
     def _boom(self, *a, **k):
         raise RuntimeError("page dictionary unavailable")
@@ -1774,7 +1774,7 @@ def test_a_page_that_will_not_read_is_loud_too(tmp_path, monkeypatch):
 
 def test_a_file_the_ink_pass_cannot_open_is_loud(tmp_path):
     """Same rule one level up: unreadable is not empty."""
-    pytest.importorskip("fitz")
+    pytest.importorskip("pymupdf")
     bad = tmp_path / "bad.pdf"
     bad.write_bytes(b"this is not a PDF")
     with pytest.raises(bm.InkMeasurementError):
@@ -1809,7 +1809,7 @@ def test_the_absence_of_pymupdf_is_the_one_silent_leg_and_it_is_declared(
     assert bm.ink_available() is True
     assert bm.page_ink(pdf), "precondition: the ink pass works here"
 
-    monkeypatch.setitem(sys.modules, "fitz", None)   # `import fitz` -> ImportError
+    monkeypatch.setitem(sys.modules, "pymupdf", None)   # `import pymupdf as fitz` -> ImportError
     assert bm.ink_available() is False
     assert bm.page_ink(pdf) == [], (
         "an ABSENT measurement is the documented empty list, not a raise")

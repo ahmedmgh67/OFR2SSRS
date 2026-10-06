@@ -15,6 +15,16 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "backend"))
 
+# PyMuPDF's SWIG-generated bindings trip a Python 3.12+ DeprecationWarning
+# ("builtin type swigvarlink has no __module__ attribute") on import and again
+# at interpreter shutdown. It is upstream build noise, not ours. Registered as
+# a pytest filter (not warnings.filterwarnings, which pytest resets) so it
+# also covers the shutdown emission.
+def pytest_configure(config):
+    config.addinivalue_line(
+        "filterwarnings",
+        r"ignore:builtin type \w+ has no __module__ attribute:DeprecationWarning")
+
 
 SYNTHETIC_XML = b"""<?xml version="1.0" encoding="WINDOWS-1252" ?>
 <report name="TEST_REPORT" DTDVersion="9.0.2.0.10"

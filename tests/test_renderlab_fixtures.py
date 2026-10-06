@@ -240,7 +240,7 @@ def test_engine_render_has_no_painted_over_text():
     root = pathlib.Path(__file__).resolve().parents[1]
     _sys.path.insert(0, str(root / "tools" / "renderlab"))
     try:
-        import fitz  # noqa: F401
+        import pymupdf as fitz  # noqa: F401
         from render import lib_ready
     except Exception:  # noqa: BLE001
         pytest.skip("renderlab not available")

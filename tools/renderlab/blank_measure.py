@@ -740,7 +740,7 @@ def ink_available() -> bool:
     geometry was measured"; with ``True`` an empty list means the DOCUMENT has
     no pages, and any fault raises instead."""
     try:
-        import fitz  # noqa: F401, PLC0415 — harness-only, optional at runtime
+        import pymupdf as fitz  # noqa: F401, PLC0415 — harness-only, optional at runtime
     except Exception:  # noqa: BLE001
         return False
     return True
@@ -788,7 +788,7 @@ def page_ink(pdf_path) -> list:
     from every rail with no signal at all, and the rails would go green on the
     exact non-Latin sheets rule (D) exists to catch."""
     try:
-        import fitz  # noqa: PLC0415 — harness-only, optional at runtime
+        import pymupdf as fitz  # noqa: PLC0415 — harness-only, optional at runtime
     except ImportError:
         return []                     # ABSENT — the one silent leg, declared
     except Exception as exc:  # noqa: BLE001 — installed but broken is a FAULT
@@ -848,7 +848,7 @@ def _page_ground(page):
     White on failure, which is the paper of a PDF that paints no background
     of its own, and the reading every caller had before this rule existed."""
     try:
-        import fitz  # noqa: PLC0415 — harness-only, optional at runtime
+        import pymupdf as fitz  # noqa: PLC0415 — harness-only, optional at runtime
 
         pix = page.get_pixmap(dpi=GROUND_DPI, colorspace=fitz.csRGB,
                               alpha=False)
@@ -870,7 +870,7 @@ def _paints_contrast(page, bbox, ground) -> bool:
     True on failure: a mark that could not be rasterised is left counting as
     ink, which can only under-report blank sheets, never invent one."""
     try:
-        import fitz  # noqa: PLC0415 — harness-only, optional at runtime
+        import pymupdf as fitz  # noqa: PLC0415 — harness-only, optional at runtime
 
         clip = fitz.Rect(bbox) & page.rect
         if clip.is_empty:

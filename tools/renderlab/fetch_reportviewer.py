@@ -19,9 +19,12 @@ LIB = Path(__file__).resolve().parent / "lib"
 CANDIDATES = [
     ("Microsoft.ReportViewer.Runtime.WinForms", "12.0.2402.15"),
     ("Microsoft.ReportViewer.Runtime.Common", "12.0.2402.15"),
-    # Spatial types assembly (v12.0.0.0) — the processing engine references
-    # it unconditionally even for reports with no spatial data.
-    ("Microsoft.SqlServer.Types", "12.0.5000.0"),
+    # Spatial types assembly — the processing engine references it
+    # unconditionally even for reports with no spatial data. ReportViewer 12
+    # binds to an older version; RenderLab.exe.config redirects it to this
+    # package's 17.0.0.0 assembly, and render_rdl.ps1's resolver matches by
+    # name only.
+    ("Microsoft.SqlServer.Types", "170.1000.7"),
 ]
 
 EXTRA_FALLBACKS = [
@@ -42,30 +45,58 @@ def _fetch(pkg: str, ver: str) -> bytes | None:
         return None
 
 
-def _unpack_dlls(nupkg: bytes) -> int:
+def _dest(name: str) -> Path | None:
+    """Where a DLL from a .nupkg goes in lib/, or None to skip it.
+
+    Managed DLLs land flat in lib/. Satellite resource DLLs and the
+    netstandard build are skipped (the .NET Framework engine wants net472).
+    Native runtimes/win-<arch>/native/*.dll go to lib/<arch>/. The engine
+    only loads SqlServerSpatial*.dll for map/spatial data, which the
+    converter never emits, so these are kept for completeness only.
+    """
+    parts = name.split("/")
+    base = parts[-1]
+    if base.lower().endswith(".resources.dll"):
+        return None
+    if len(parts) >= 2 and parts[1].lower().startswith("netstandard"):
+        return None
+    if parts[0].lower() == "runtimes":
+        if len(parts) != 4 or parts[2].lower() != "native":
+            return None
+        return LIB / parts[1].lower().removeprefix("win-") / base
+    return LIB / base
+
+
+def _unpack_dlls(nupkg: bytes, written: set[Path]) -> int:
     n = 0
     with zipfile.ZipFile(io.BytesIO(nupkg)) as z:
         for name in z.namelist():
             if not name.lower().endswith(".dll"):
                 continue
-            base = Path(name).name
-            dest = LIB / base
-            if dest.exists():
+            dest = _dest(name)
+            if dest is None:
                 continue
+            # First writer this run wins; a file left by an earlier run
+            # (e.g. an older package version) is replaced.
+            if dest in written:
+                continue
+            dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(z.read(name))
+            written.add(dest)
             n += 1
-            print(f"      -> {base}")
+            print(f"      -> {dest.relative_to(LIB)}")
     return n
 
 
 def main() -> int:
     LIB.mkdir(parents=True, exist_ok=True)
     got_any = False
+    written: set[Path] = set()
     print("Fetching ReportViewer runtime packages from nuget.org ...")
     for pkg, ver in CANDIDATES:
         data = _fetch(pkg, ver)
         if data:
-            _unpack_dlls(data)
+            _unpack_dlls(data, written)
             got_any = True
     needed = {"Microsoft.ReportViewer.WinForms.dll",
               "Microsoft.ReportViewer.Common.dll",
@@ -77,7 +108,7 @@ def main() -> int:
         for pkg, ver in EXTRA_FALLBACKS:
             data = _fetch(pkg, ver)
             if data:
-                _unpack_dlls(data)
+                _unpack_dlls(data, written)
         have = {p.name for p in LIB.glob("*.dll")}
         missing = needed - have
     print(f"\nDLLs present: {sorted(have)}")

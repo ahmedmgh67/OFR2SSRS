@@ -55,12 +55,18 @@ Official Microsoft packages from NuGet. Each `.nupkg` is a zip file.
 |---------|---------|----------|
 | Microsoft.ReportViewer.Runtime.WinForms | 12.0.2402.15 | [nuget.org page](https://www.nuget.org/packages/Microsoft.ReportViewer.Runtime.WinForms/12.0.2402.15) · [direct .nupkg](https://www.nuget.org/api/v2/package/Microsoft.ReportViewer.Runtime.WinForms/12.0.2402.15) |
 | Microsoft.ReportViewer.Runtime.Common | 12.0.2402.15 | [nuget.org page](https://www.nuget.org/packages/Microsoft.ReportViewer.Runtime.Common/12.0.2402.15) · [direct .nupkg](https://www.nuget.org/api/v2/package/Microsoft.ReportViewer.Runtime.Common/12.0.2402.15) |
-| Microsoft.SqlServer.Types | 12.0.5000.0 | [nuget.org page](https://www.nuget.org/packages/Microsoft.SqlServer.Types/12.0.5000.0) · [direct .nupkg](https://www.nuget.org/api/v2/package/Microsoft.SqlServer.Types/12.0.5000.0) |
+| Microsoft.SqlServer.Types | 170.1000.7 | [nuget.org page](https://www.nuget.org/packages/Microsoft.SqlServer.Types/170.1000.7) · [direct .nupkg](https://www.nuget.org/api/v2/package/Microsoft.SqlServer.Types/170.1000.7) |
 
 **To install:** from the project folder, run
 `python tools/renderlab/fetch_reportviewer.py`. It downloads the three
 packages and puts the DLLs in `tools\renderlab\lib\`. Copy that folder to
 the server.
+
+**Upgrading an existing server:** replace `tools\renderlab\lib\` with a
+freshly fetched one at the same time as you update the app.
+`RenderLab.exe.config` expects Microsoft.SqlServer.Types 17.0.0.0; an old
+`lib\` still holding the 12.x DLL makes renders fail with "manifest
+definition does not match".
 
 ## 5. The app itself
 

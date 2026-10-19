@@ -18,6 +18,27 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 Run it again after unzipping a new version over the old one to upgrade.
 `-SkipFirewall` keeps the port closed; `-SkipTask` skips the startup task.
 
+## Single-file option
+
+Instead of the steps below, one wheel can carry the app and every Python
+library. Download the one matching the server's Python on a machine with
+internet (`3.13` or `3.15`):
+
+```powershell
+pip download oracle2ssrs --no-deps --only-binary=:all: --platform win_amd64 --python-version 3.15 -d .
+```
+
+Or build it from the source: `python tools\build_offline_wheel.py --python-version 3.15`
+(needs `pip install build wheel`). Copy the `.whl` to the server, then:
+
+```powershell
+& "C:\Program Files\Python315\python.exe" -m pip install --no-index oracle2ssrs-1.0.2-cp315-cp315-win_amd64.whl
+oracle2ssrs --host 0.0.0.0 --port 5057
+```
+
+`oracle2ssrs-convert <folder> --out <folder>` converts without the web UI.
+Put `.env` in the folder you start it from.
+
 ## 1. Copy the files to the server
 
 Unzip the app to `D:\Apps\OFR2SSRS`, then copy in:

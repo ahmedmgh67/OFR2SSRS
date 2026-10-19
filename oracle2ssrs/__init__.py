@@ -15,6 +15,11 @@ _HERE = Path(__file__).resolve().parent
 ROOT = _HERE if (_HERE / "backend").is_dir() else _HERE.parent
 BACKEND = ROOT / "backend"
 
+# The offline wheel (tools/build_offline_wheel.py) carries its dependencies
+# here; put them first so the bundled versions are the ones used.
+_VENDOR = _HERE / "_vendor"
+if _VENDOR.is_dir() and str(_VENDOR) not in sys.path:
+    sys.path.insert(0, str(_VENDOR))
 
 
 def _use_backend() -> None:

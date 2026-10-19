@@ -38,9 +38,12 @@ way — only local proof-rendering is affected.
 python backend/app.py
 ```
 
-Then open `http://localhost:5000`. The single-page app serves from
+Then open `http://localhost:5057`. The single-page app serves from
 `frontend/`. Everything runs locally — no report content leaves the
 machine.
+
+To run it on a Windows Server without internet access, follow
+[WINDOWS_SERVER_DEPLOYMENT.md](WINDOWS_SERVER_DEPLOYMENT.md).
 
 ---
 

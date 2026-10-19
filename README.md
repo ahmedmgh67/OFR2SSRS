@@ -342,6 +342,9 @@ New here? Start with the **[deployment run guide](docs/RUN_GUIDE.md)** —
 install, convert, read the verdict banner, and deploy to a Report Server.
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module-by-module
 breakdown and [docs/API.md](docs/API.md) for the HTTP endpoint reference.
+Running it on an offline Windows Server? See the
+[download list](docs/WINDOWS_SERVER_PREREQUISITES.md) and the
+[Windows Server steps](docs/WINDOWS_SERVER_DEPLOYMENT.md).
 
 ## Testing
 

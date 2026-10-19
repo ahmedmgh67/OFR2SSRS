@@ -11,4 +11,4 @@ pypdf>=6.21.1
 # Rasterises the engine-rendered PDF into the Preview tab's page images
 # (import name: pymupdf). Without it the preview falls back to embedding the
 # PDF itself — the feature still works, just without per-page PNGs.
-PyMuPDF>=1.28.2
+PyMuPDF>=1.28.2,<2

@@ -36,7 +36,7 @@ libraries marked *Windows build*, pick the file ending in
 | python-docx | 1.2.0 | <https://pypi.org/project/python-docx/1.2.0/#files> |
 | typing_extensions | 4.16.0 | <https://pypi.org/project/typing-extensions/4.16.0/#files> |
 | python-dotenv | 1.2.4 | <https://pypi.org/project/python-dotenv/1.2.4/#files> |
-| pypdf | 6.19.0 | <https://pypi.org/project/pypdf/6.19.0/#files> |
+| pypdf | 6.21.1 | <https://pypi.org/project/pypdf/6.21.1/#files> |
 | PyMuPDF *(Windows build)* | 1.28.2 | <https://pypi.org/project/PyMuPDF/1.28.2/#files> |
 | waitress (web server) | 3.0.2 | <https://pypi.org/project/waitress/3.0.2/#files> |
 

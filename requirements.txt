@@ -7,7 +7,7 @@ python-dotenv>=1.2.4
 # Used by the batch Migration Assessment's --render measurement step and the
 # RenderLab verification tests (both degrade gracefully without it, but it
 # should work out of the box).
-pypdf>=6.19.0
+pypdf>=6.21.1
 # Rasterises the engine-rendered PDF into the Preview tab's page images
 # (import name: pymupdf). Without it the preview falls back to embedding the
 # PDF itself — the feature still works, just without per-page PNGs.

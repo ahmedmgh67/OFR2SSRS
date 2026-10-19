@@ -49,7 +49,7 @@ def invoke(code: str, calls, timeout: int = 180) -> dict:
             proc = subprocess.run(
                 [ps, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
                  _PS1, "-InFile", path],
-                capture_output=True, text=True, timeout=timeout)
+                capture_output=True, text=True, errors="replace", timeout=timeout)
         except (OSError, subprocess.TimeoutExpired) as exc:
             return {"available": False, "reason": str(exc)}
         out = (proc.stdout or "").strip()

@@ -48,7 +48,7 @@ def render_to_pdf(rdl_xml: str, out_pdf: Path, rows: int = 3,
             ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
              "-File", str(PS1), "-RdlPath", str(srdl), "-DataJson", str(djs),
              "-OutPdf", str(out_pdf), "-LibDir", str(LIB)],
-            capture_output=True, text=True, timeout=timeout)
+            capture_output=True, text=True, errors="replace", timeout=timeout)
     log = (proc.stdout or "") + (proc.stderr or "")
     ok = proc.returncode == 0 and out_pdf.exists()
     return {"ok": ok, "pdf": str(out_pdf) if ok else None, "log": log}

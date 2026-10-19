@@ -953,7 +953,7 @@ def _autofetch_render_engine() -> None:
     script = HERE.parent / "tools" / "renderlab" / "fetch_reportviewer.py"
     try:
         subprocess.run([sys.executable, str(script)], capture_output=True,
-                       text=True, timeout=300)
+                       text=True, errors="replace", timeout=300)
     except Exception:  # noqa: BLE001 - offline/proxy; caller reports it
         pass
 
@@ -1081,7 +1081,7 @@ def api_render_preview():
                     ["powershell", "-NoProfile", "-ExecutionPolicy",
                      "Bypass", "-File", str(ps1), "-RdlPath", str(rp),
                      "-ServerUrl", rsu, "-OutPdf", str(pdf)],
-                    capture_output=True, text=True, timeout=180)
+                    capture_output=True, text=True, errors="replace", timeout=180)
                 log = (proc.stdout or "") + (proc.stderr or "")
                 if proc.returncode == 0 and pdf.exists()                         and pdf.stat().st_size > 100:
                     pdf_b64 = base64.b64encode(

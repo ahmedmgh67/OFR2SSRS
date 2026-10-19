@@ -51,7 +51,7 @@ def ensure_exe() -> bool:
          "/r:System.Web.Extensions.dll",
          "/r:System.Data.dll",
          str(CS)],
-        capture_output=True, text=True, cwd=str(HERE),
+        capture_output=True, text=True, errors="replace", cwd=str(HERE),
     )
     if proc.returncode != 0:
         print("csc failed:", (proc.stdout or "") + (proc.stderr or ""))
@@ -142,7 +142,7 @@ def expression_host_available() -> bool:
     try:
         # No-arg launch: RenderLab prints usage + exits 2 (so it LAUNCHED). A
         # blocked exe raises OSError at CreateProcess, before main() ever runs.
-        subprocess.run([str(EXE)], capture_output=True, text=True, timeout=30)
+        subprocess.run([str(EXE)], capture_output=True, text=True, errors="replace", timeout=30)
         _EXPR_HOST = True
     except OSError:
         _EXPR_HOST = False
@@ -171,7 +171,7 @@ def _render_via_ps1(rdl_path: Path, out_pdf: Path, rows: int,
              "-File", str(PS1), "-RdlPath", str(srdl), "-DataJson", str(djs),
              "-OutPdf", str(out_pdf), "-LibDir", str(LIB),
              "-Format", fmt],
-            capture_output=True, text=True, timeout=timeout,
+            capture_output=True, text=True, errors="replace", timeout=timeout,
         )
     log = (proc.stdout or "") + (proc.stderr or "")
     ok = proc.returncode == 0 and out_pdf.exists()
@@ -205,7 +205,7 @@ def render_rdl(rdl_path: str | Path, out_pdf: str | Path,
         try:
             proc = subprocess.run(
                 [str(EXE), str(rdl_path), data_json, str(out_pdf)],
-                capture_output=True, text=True, timeout=timeout,
+                capture_output=True, text=True, errors="replace", timeout=timeout,
             )
             log = (proc.stdout or "") + (proc.stderr or "")
             if proc.returncode == 0 and out_pdf.exists():

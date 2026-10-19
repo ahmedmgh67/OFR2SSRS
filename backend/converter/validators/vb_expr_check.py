@@ -111,7 +111,7 @@ def check_rdl_expressions(rdl_xml: str, timeout: int = 240) -> Dict[str, Any]:
         proc = subprocess.run(
             [ps, "-NoProfile", "-ExecutionPolicy", "Bypass",
              "-File", _PS_SCRIPT, "-InFile", tmp.name],
-            capture_output=True, text=True, timeout=timeout,
+            capture_output=True, text=True, errors="replace", timeout=timeout,
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
         return {"available": False, "reason": f"harness invocation failed: {exc}",

@@ -7,6 +7,17 @@ access. Get the files first:
 The examples install to `D:\Apps\OFR2SSRS`. Run the commands in
 **PowerShell as Administrator**.
 
+**Shortcut:** after step 1, `deploy.ps1` does steps 2–6 for you. Put the
+Python installer in the app folder too, then run as Administrator:
+
+```powershell
+cd D:\Apps\OFR2SSRS
+powershell -ExecutionPolicy Bypass -File .\deploy.ps1
+```
+
+Run it again after unzipping a new version over the old one to upgrade.
+`-SkipFirewall` keeps the port closed; `-SkipTask` skips the startup task.
+
 ## 1. Copy the files to the server
 
 Unzip the app to `D:\Apps\OFR2SSRS`, then copy in:

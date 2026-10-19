@@ -67,6 +67,21 @@ unavailable.
 
 ## Quick start
 
+### Install with pip
+
+```bash
+pip install oracle2ssrs
+
+oracle2ssrs                                   # web app at http://127.0.0.1:5057
+oracle2ssrs-convert reports/ --out out        # batch-convert without the UI
+```
+
+`oracle2ssrs --host 0.0.0.0 --port 8080` serves other machines on another
+port. Settings (`O2S_*`) are read from a `.env` file in the folder you
+start it from. Requires Python 3.10+.
+
+### Run from source
+
 ```bash
 git clone https://github.com/Maximilian741/OFR2SSRS.git
 cd OFR2SSRS

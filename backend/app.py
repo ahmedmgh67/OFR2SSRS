@@ -17,6 +17,9 @@ from pathlib import Path
 try:
     from dotenv import load_dotenv
     from pathlib import Path as _Path
+    # The current folder first (a pip install has no project folder), then
+    # the project root. A variable already set is never overridden.
+    load_dotenv(_Path.cwd() / ".env")
     load_dotenv(_Path(__file__).resolve().parent.parent / ".env")
 except ImportError:
     pass

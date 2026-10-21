@@ -1296,7 +1296,7 @@ def api_batch():
     the Migration Assessment + a zip of every RDL. Form: files[] (.xml),
     optional target_db, optional render=1 (verify each RDL through the
     local MS rendering engine when tools/renderlab is set up)."""
-    from converter.batch import batch_convert, build_batch_zip
+    from converter.batch import batch_convert, build_batch_zip, slim_row
     items = []
     for f in request.files.getlist("files"):
         try:
@@ -1333,8 +1333,7 @@ def api_batch():
         _BATCH_STORE[_sid()] = {"batch": batch,
                                 "zip": build_batch_zip(batch)}
         _evict(_BATCH_STORE)
-        slim = [{k: v for k, v in r.items() if k != "rdl_xml"}
-                for r in batch.get("results") or []]
+        slim = [slim_row(r) for r in batch.get("results") or []]
         return jsonify({"results": slim, "locked": batch.get("locked"),
                         "tier": batch.get("tier"),
                         "rendered": batch.get("rendered"),

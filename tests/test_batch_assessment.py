@@ -175,3 +175,64 @@ def test_batch_convert_names_why_it_did_not_render(monkeypatch):
     assert out["rendered"] is False
     assert "engine" in out["render_note"].lower()
     assert batch_convert(_items(), render=False).get("render_note") is None
+
+
+_FAKE_PDF = b"%PDF-1.4\n% fake engine output\n%%EOF\n"
+
+
+def _engine_renders(monkeypatch):
+    """A working engine: writes a PDF where render_rdl is told to."""
+    import converter.batch as batch_mod
+
+    def fake_render(rdl_path, out_pdf, rows=3):
+        Path(out_pdf).write_bytes(_FAKE_PDF)
+        return {"ok": True, "pdf": str(out_pdf), "log": "", "mode": "expression"}
+
+    monkeypatch.setattr(batch_mod, "_renderlab", lambda: (fake_render, True))
+    monkeypatch.setattr(batch_mod, "_measure_pdf",
+                        lambda *a, **k: {"pages": 1, "blank_pages": []})
+
+
+def test_batch_keeps_each_rendered_pdf_in_the_pack(monkeypatch):
+    _engine_renders(monkeypatch)
+    items = _items()
+    items.append(("dup/" + items[0][0], items[0][1]))     # same stem twice
+    batch = batch_convert(items, render=True)
+    stems = [r["file_stem"] for r in batch["results"]]
+    assert len(set(stems)) == len(stems), stems
+    zf = zipfile.ZipFile(io.BytesIO(build_batch_zip(batch)))
+    names = zf.namelist()
+    for s in stems:
+        assert f"pdf/{s}.pdf" in names, names
+        assert f"rdl/{s}.rdl" in names, names
+        assert zf.read(f"pdf/{s}.pdf") == _FAKE_PDF
+    html = zf.read("ASSESSMENT.html").decode("utf-8")
+    for s in stems:
+        assert f'href="pdf/{s}.pdf"' in html
+    meta = json.loads(zf.read("assessment.json"))
+    assert all("pdf_bytes" not in r for r in meta["results"])
+
+
+def test_batch_without_render_has_no_pdf_folder(monkeypatch):
+    batch = batch_convert(_items(), render=False)
+    names = zipfile.ZipFile(io.BytesIO(build_batch_zip(batch))).namelist()
+    assert not any(n.startswith("pdf/") for n in names)
+    assert "pdf/" not in build_assessment_html(batch)
+
+
+def test_batch_endpoint_json_carries_no_pdf_bytes(monkeypatch):
+    _engine_renders(monkeypatch)
+    import app as app_mod
+    monkeypatch.setattr(app_mod, "_autofetch_render_engine", lambda: None)
+    with app_mod.app.test_client() as client:
+        data = {"files": [(io.BytesIO(b), n) for n, b in _items()],
+                "render": "1"}
+        r = client.post("/api/batch", data=data,
+                        content_type="multipart/form-data")
+        assert r.status_code == 200, r.get_data(as_text=True)[:300]
+        j = r.get_json()
+        assert all("pdf_bytes" not in row for row in j["results"])
+        assert all(row.get("has_pdf") for row in j["results"])
+        pack = client.get("/api/download/batch-pack")
+        names = zipfile.ZipFile(io.BytesIO(pack.data)).namelist()
+        assert sum(n.startswith("pdf/") for n in names) == 2

@@ -92,12 +92,20 @@ def batch_convert(items: List[Tuple[str, bytes]],
 
     results: List[Dict[str, Any]] = []
     locked: List[str] = []
+    stems_used: set = set()
     for idx, (fname, blob) in enumerate(items):
         stem = _safe_name(Path(fname).stem)
         if limit is not None and idx >= limit:
             locked.append(stem)
             continue
-        row: Dict[str, Any] = {"name": stem, "source_file": fname}
+        # One name per report for its rdl/ and pdf/ files in the pack, so
+        # two sources with the same stem never overwrite each other.
+        file_stem, n = stem, 2
+        while file_stem in stems_used:
+            file_stem, n = f"{stem}_{n}", n + 1
+        stems_used.add(file_stem)
+        row: Dict[str, Any] = {"name": stem, "source_file": fname,
+                               "file_stem": file_stem}
         try:
             data = convert(blob, target_db=target_db)
             pf = data.get("preflight") or {}
@@ -144,6 +152,10 @@ def batch_convert(items: List[Tuple[str, bytes]],
                     if res.get("ok") and res.get("pdf"):
                         row.update(_measure_pdf(res["pdf"], row["rdl_xml"],
                                                 res.get("mode")))
+                        # Keep the PDF for the migration pack; the temp
+                        # folder it was rendered into is deleted below.
+                        if Path(res["pdf"]).is_file():
+                            row["pdf_bytes"] = Path(res["pdf"]).read_bytes()
                     if not res.get("ok"):
                         row["effort"] = "assisted" \
                             if row["effort"] in ("automatic", "light-touch") \
@@ -192,6 +204,10 @@ def build_assessment_html(batch: Dict[str, Any],
         eff = r.get("effort") or "?"
         color = _TIER_COLORS.get(eff, "#334155")
         render_s = "—"
+        pdf_link = ""
+        if r.get("pdf_bytes") and r.get("file_stem"):
+            pdf_link = (f' &middot; <a href="pdf/{esc(r["file_stem"])}.pdf">'
+                        "PDF</a>")
         if rendered:
             if r.get("render_ok") is True:
                 blanks = r.get("blank_pages") or []
@@ -226,7 +242,7 @@ def build_assessment_html(batch: Dict[str, Any],
             f"<td style='text-align:center'>{fid_s}</td>"
             f"<td style='text-align:center'>{r.get('datasets', '—')}</td>"
             f"<td style='text-align:center'>{r.get('parameters', '—')}</td>"
-            f"<td>{esc(render_s)}</td>"
+            f"<td>{esc(render_s)}{pdf_link}</td>"
             f"<td style='font-size:11px;color:#475569'>{notes}</td>"
             "</tr>")
     for name in (batch.get("locked") or []):
@@ -289,20 +305,23 @@ flagged blockers; “manual” = the source needs hands-on conversion.</div>
 
 
 def build_batch_zip(batch: Dict[str, Any]) -> bytes:
-    """Zip: every generated RDL + ASSESSMENT.html + assessment.json."""
+    """Zip: every generated RDL, every rendered PDF, ASSESSMENT.html and
+    assessment.json."""
     buf = io.BytesIO()
     slim = []
     used: set = set()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for r in batch.get("results") or []:
+            base = r.get("file_stem") or r["name"]
             if r.get("rdl_xml"):
-                base = r["name"]
                 entry, n = f"rdl/{base}.rdl", 2
                 while entry in used:                  # distinct same-stem files
-                    entry, n = f"rdl/{base}_{n}.rdl", n + 1
+                    entry, n = f"rdl/{r['name']}_{n}.rdl", n + 1
                 used.add(entry)
                 z.writestr(entry, r["rdl_xml"])
-            slim.append({k: v for k, v in r.items() if k != "rdl_xml"})
+            if r.get("pdf_bytes"):
+                z.writestr(f"pdf/{base}.pdf", r["pdf_bytes"])
+            slim.append(slim_row(r))
         z.writestr("ASSESSMENT.html", build_assessment_html(batch))
         z.writestr("assessment.json", json.dumps(
             {**{k: v for k, v in batch.items() if k != "results"},
@@ -310,4 +329,12 @@ def build_batch_zip(batch: Dict[str, Any]) -> bytes:
     return buf.getvalue()
 
 
-__all__ = ["batch_convert", "build_assessment_html", "build_batch_zip"]
+def slim_row(r: Dict[str, Any]) -> Dict[str, Any]:
+    """A result row safe for JSON: no RDL text, no PDF bytes."""
+    out = {k: v for k, v in r.items() if k not in ("rdl_xml", "pdf_bytes")}
+    out["has_pdf"] = bool(r.get("pdf_bytes"))
+    return out
+
+
+__all__ = ["batch_convert", "build_assessment_html", "build_batch_zip",
+           "slim_row"]

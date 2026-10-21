@@ -74,9 +74,13 @@ def main() -> int:
     rdl_dir = out_dir / "rdl"
     rdl_dir.mkdir(exist_ok=True)
     for r in batch["results"]:
+        stem = r.get("file_stem") or r["name"]
         if r.get("rdl_xml"):
-            (rdl_dir / (r["name"] + ".rdl")).write_text(
+            (rdl_dir / (stem + ".rdl")).write_text(
                 r["rdl_xml"], encoding="utf-8")
+        if r.get("pdf_bytes"):                   # linked from ASSESSMENT.html
+            (out_dir / "pdf").mkdir(exist_ok=True)
+            (out_dir / "pdf" / (stem + ".pdf")).write_bytes(r["pdf_bytes"])
 
     if batch.get("render_note"):
         print(f"\nnote: {batch['render_note']}")

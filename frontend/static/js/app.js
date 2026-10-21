@@ -1192,6 +1192,9 @@ function wireBatch() {
           const good = rows.filter(x => x.render_ok === true).length;
           msg += " — rendered " + good + " of " + rows.length
             + (good < rows.length ? " (see the assessment for the rest)" : "");
+          if (rows.some(x => x.has_pdf)) {
+            msg += ". The PDFs are in the migration pack (pdf/ folder)";
+          }
         } else {
           msg += " — not rendered: " + (j.render_note
             || "Microsoft's report engine is not available");

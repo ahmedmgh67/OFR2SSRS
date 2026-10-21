@@ -153,8 +153,16 @@ def batch_convert(items: List[Tuple[str, bytes]],
                 row["render_error"] = f"{type(e).__name__}: {e}"
     # (loop end)
         results.append(row)
+    render_note = None
+    if render and not render_ok:
+        render_note = ("Microsoft's report engine is not set up on this "
+                       "computer, so the reports were converted but not "
+                       "rendered. It downloads automatically (Windows, needs "
+                       "internet once), or run "
+                       "tools/renderlab/fetch_reportviewer.py.")
     return {"results": results, "locked": locked,
-            "tier": tier_label(), "rendered": bool(render_ok and render)}
+            "tier": tier_label(), "rendered": bool(render_ok and render),
+            "render_note": render_note}
 
 
 # ---------------------------------------------------------------------------

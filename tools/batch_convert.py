@@ -78,6 +78,8 @@ def main() -> int:
             (rdl_dir / (r["name"] + ".rdl")).write_text(
                 r["rdl_xml"], encoding="utf-8")
 
+    if batch.get("render_note"):
+        print(f"\nnote: {batch['render_note']}")
     print(f"\n{'report':30} {'effort':12} {'check':7} {'fidelity':>8}"
           + ("  render" if batch.get("rendered") else ""))
     print("-" * 70)

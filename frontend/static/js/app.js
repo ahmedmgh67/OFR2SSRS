@@ -1186,6 +1186,17 @@ function wireBatch() {
         msg += " — " + j.locked.length + " skipped (over the "
           + (j.tier || "") + " batch limit)";
       }
+      if (chk && chk.checked) {
+        if (j.rendered) {
+          const rows = j.results || [];
+          const good = rows.filter(x => x.render_ok === true).length;
+          msg += " — rendered " + good + " of " + rows.length
+            + (good < rows.length ? " (see the assessment for the rest)" : "");
+        } else {
+          msg += " — not rendered: " + (j.render_note
+            || "Microsoft's report engine is not available");
+        }
+      }
       setInlineStatus(status, "done", msg);
       if (resBox) {
         const a = document.createElement("a");

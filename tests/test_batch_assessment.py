@@ -122,3 +122,56 @@ def test_a_failed_blank_measure_is_named_not_shown_as_a_clean_render():
     html = build_assessment_html(broke)
     assert "BLANK MEASURE FAILED" in html
     assert "InkMeasurementError" in html
+
+
+def _engine_missing(monkeypatch):
+    """No ReportViewer DLLs (a fresh pip install), and no real render."""
+    sys.path.insert(0, str(ROOT / "tools" / "renderlab"))
+    import render
+    import converter.batch as batch_mod
+    monkeypatch.setattr(render, "lib_ready", lambda: False)
+    monkeypatch.setattr(batch_mod, "_renderlab", lambda: (None, False))
+
+
+def test_batch_render_fetches_the_engine_like_preview_does(monkeypatch):
+    """Ticking "render each one" must download the engine when it is missing,
+    exactly as the single-report Preview does -- not silently skip it."""
+    monkeypatch.delenv("O2S_BATCH_LIMIT", raising=False)
+    _engine_missing(monkeypatch)
+    import app as app_mod
+    calls = []
+    monkeypatch.setattr(app_mod, "_autofetch_render_engine",
+                        lambda: calls.append(1))
+    with app_mod.app.test_client() as client:
+        data = {"files": [(io.BytesIO(b), n) for n, b in _items()],
+                "render": "1"}
+        r = client.post("/api/batch", data=data,
+                        content_type="multipart/form-data")
+    assert r.status_code == 200, r.get_data(as_text=True)[:300]
+    assert calls == [1]
+    j = r.get_json()
+    assert j["rendered"] is False
+    assert j["render_note"], "a skipped render must say why"
+
+
+def test_batch_without_render_does_not_fetch(monkeypatch):
+    _engine_missing(monkeypatch)
+    import app as app_mod
+    calls = []
+    monkeypatch.setattr(app_mod, "_autofetch_render_engine",
+                        lambda: calls.append(1))
+    with app_mod.app.test_client() as client:
+        data = {"files": [(io.BytesIO(b), n) for n, b in _items()]}
+        r = client.post("/api/batch", data=data,
+                        content_type="multipart/form-data")
+    assert r.status_code == 200
+    assert calls == []
+    assert not r.get_json().get("render_note")
+
+
+def test_batch_convert_names_why_it_did_not_render(monkeypatch):
+    _engine_missing(monkeypatch)
+    out = batch_convert(_items(), render=True)
+    assert out["rendered"] is False
+    assert "engine" in out["render_note"].lower()
+    assert batch_convert(_items(), render=False).get("render_note") is None

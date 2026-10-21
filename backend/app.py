@@ -1311,6 +1311,18 @@ def api_batch():
                     "no_report_in_drop", 400)
     target_db = _resolve_target_db(request)
     want_render = (request.form.get("render") or "").strip() in ("1", "true", "on")
+    if want_render:
+        # Same first-use download the single-report Preview does; without
+        # it a fresh install converts the batch and silently skips rendering.
+        try:
+            tools = str(HERE.parent / "tools" / "renderlab")
+            if tools not in sys.path:
+                sys.path.insert(0, tools)
+            from render import lib_ready
+            if not lib_ready():
+                _autofetch_render_engine()
+        except Exception:  # noqa: BLE001 - batch_convert reports it
+            pass
     try:
         batch = batch_convert(items, target_db=target_db, render=want_render)
         # Session data source binding applies to every artifact we ship.
@@ -1325,7 +1337,8 @@ def api_batch():
                 for r in batch.get("results") or []]
         return jsonify({"results": slim, "locked": batch.get("locked"),
                         "tier": batch.get("tier"),
-                        "rendered": batch.get("rendered")})
+                        "rendered": batch.get("rendered"),
+                        "render_note": batch.get("render_note")})
     except Exception as e:
         traceback.print_exc()
         return _crash(e)

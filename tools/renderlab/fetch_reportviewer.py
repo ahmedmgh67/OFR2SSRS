@@ -1,8 +1,9 @@
 """Fetch the Microsoft ReportViewer 2015 runtime (RDL-2008 capable) from
 nuget.org and unpack its DLLs into tools/renderlab/lib/ (gitignored).
 
-These are official Microsoft packages; a .nupkg is a zip. We try a list of
-known package ids so a renamed/unlisted package doesn't strand us.
+The DLLs are Microsoft's redistributables; a .nupkg is a zip. We try a
+list of known package ids so a renamed/unlisted package doesn't strand us.
+License files shipped in a package land in lib/licenses/.
 """
 from __future__ import annotations
 
@@ -19,12 +20,11 @@ LIB = Path(__file__).resolve().parent / "lib"
 CANDIDATES = [
     ("Microsoft.ReportViewer.Runtime.WinForms", "12.0.2402.15"),
     ("Microsoft.ReportViewer.Runtime.Common", "12.0.2402.15"),
-    # Spatial types assembly — the processing engine references it
-    # unconditionally even for reports with no spatial data. ReportViewer 12
-    # binds to an older version; RenderLab.exe.config redirects it to this
-    # package's 17.0.0.0 assembly, and render_rdl.ps1's resolver matches by
-    # name only.
-    ("Microsoft.SqlServer.Types", "170.1000.7"),
+    # Spatial types assembly (v12.0.0.0, exactly what ReportViewer 12 binds
+    # to) — the processing engine references it unconditionally even for
+    # reports with no spatial data. Stay on 12.x: the 170.x package ships
+    # under an evaluation-only pre-release license.
+    ("Microsoft.SqlServer.Types", "12.0.5000.0"),
 ]
 
 EXTRA_FALLBACKS = [
@@ -46,16 +46,22 @@ def _fetch(pkg: str, ver: str) -> bytes | None:
 
 
 def _dest(name: str) -> Path | None:
-    """Where a DLL from a .nupkg goes in lib/, or None to skip it.
+    """Where a file from a .nupkg goes in lib/, or None to skip it.
 
-    Managed DLLs land flat in lib/. Satellite resource DLLs and the
-    netstandard build are skipped (the .NET Framework engine wants net472).
-    Native runtimes/win-<arch>/native/*.dll go to lib/<arch>/. The engine
-    only loads SqlServerSpatial*.dll for map/spatial data, which the
-    converter never emits, so these are kept for completeness only.
+    Managed DLLs land flat in lib/. Satellite resource DLLs and netstandard
+    builds are skipped (the engine is .NET Framework). Native DLLs
+    (nativeBinaries/<arch>/ or runtimes/win-<arch>/native/) go to
+    lib/<arch>/; the engine only loads them for map/spatial data, which the
+    converter never emits. license/* goes to lib/licenses/.
     """
     parts = name.split("/")
     base = parts[-1]
+    if not base:
+        return None
+    if parts[0].lower() == "license":
+        return LIB / "licenses" / base
+    if not base.lower().endswith(".dll"):
+        return None
     if base.lower().endswith(".resources.dll"):
         return None
     if len(parts) >= 2 and parts[1].lower().startswith("netstandard"):
@@ -64,6 +70,8 @@ def _dest(name: str) -> Path | None:
         if len(parts) != 4 or parts[2].lower() != "native":
             return None
         return LIB / parts[1].lower().removeprefix("win-") / base
+    if parts[0].lower() == "nativebinaries" and len(parts) == 3:
+        return LIB / parts[1].lower() / base
     return LIB / base
 
 
@@ -71,8 +79,6 @@ def _unpack_dlls(nupkg: bytes, written: set[Path]) -> int:
     n = 0
     with zipfile.ZipFile(io.BytesIO(nupkg)) as z:
         for name in z.namelist():
-            if not name.lower().endswith(".dll"):
-                continue
             dest = _dest(name)
             if dest is None:
                 continue

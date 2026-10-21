@@ -111,8 +111,8 @@ if (-not (Test-Path (Join-Path $LibDir 'Microsoft.ReportViewer.WinForms.dll'))) 
     Warn "Microsoft.SqlServer.Types.dll is missing from $LibDir. Preview will fail."
 } else {
     $v = [Reflection.AssemblyName]::GetAssemblyName($types).Version
-    if ($v.Major -ne 17) {
-        Warn "Microsoft.SqlServer.Types.dll is version $v; this app needs 17.x."
+    if ($v.Major -ne 12) {
+        Warn "Microsoft.SqlServer.Types.dll is version $v; this app needs 12.x."
         Warn "Replace $LibDir with a freshly fetched one, or Preview will fail."
     } else {
         Ok "Present (SqlServer.Types $v)"

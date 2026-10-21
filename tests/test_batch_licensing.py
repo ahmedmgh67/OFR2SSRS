@@ -1,5 +1,6 @@
-"""Monetization layer: batch convert + the licensing gate. The community tier
-caps a batch at a fixed limit and LOCKS the excess (the upsell). A silent
+"""Monetization layer: batch convert + the licensing gate. The default tier
+is Pro (no cap); the opt-in community tier caps a batch at a fixed limit and
+LOCKS the excess. A silent
 break here is a revenue leak, so it's gated by tests: the cap is enforced,
 the assessment HTML and batch zip generate, and the locked items are named.
 """
@@ -29,12 +30,21 @@ def _items(n):
     return [(f"report_{i}.xml", blob) for i in range(n)]
 
 
-def test_community_tier_caps_batch_and_locks_excess():
+def test_default_tier_is_pro_and_uncapped(monkeypatch):
+    monkeypatch.delenv("O2S_LICENSE", raising=False)
+    monkeypatch.delenv("O2S_BATCH_LIMIT", raising=False)
+    assert licensing.current_tier() == "pro"
+    assert licensing.batch_limit() is None
+    assert licensing.tier_label() == "Pro"
+
+
+def test_community_tier_caps_batch_and_locks_excess(monkeypatch):
     if not _FIX.exists():
         pytest.skip("fixture missing")
+    monkeypatch.setenv("O2S_LICENSE", "community")
+    monkeypatch.delenv("O2S_BATCH_LIMIT", raising=False)
     limit = licensing.batch_limit()
-    if not limit:
-        pytest.skip("unlimited tier configured; cap test n/a")
+    assert limit == 10
     out = batch_convert(_items(limit + 5))
     results = out.get("results") or []
     locked = out.get("locked") or []

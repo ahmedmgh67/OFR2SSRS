@@ -226,8 +226,8 @@ python -m backend.converter.batch <folder-of-xml> --out <outdir>
 ```
 
 Produces every RDL plus a **Migration Assessment** (per-report verdicts,
-fidelity scores, effort tiers). The community tier processes batches of
-10; set `O2S_LICENSE` for larger tiers. The same runs via `/api/batch`.
+fidelity scores, effort tiers). Batches have no size limit;
+`O2S_BATCH_LIMIT=<n>` sets a cap. The same runs via `/api/batch`.
 
 ---
 

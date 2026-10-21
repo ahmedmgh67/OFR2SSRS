@@ -268,9 +268,8 @@ render-verified through the MS engine, and classified into an effort tier
 (`automatic` / `light-touch` / `assisted` / `manual`). You get
 `out/rdl/*.rdl`, a printable `ASSESSMENT.html` executive summary, and a
 `migration_pack.zip`. The same flow is available in the app sidebar ("Batch
-migration") and over HTTP (`POST /api/batch`). The Community Edition
-processes up to 10 reports per batch (single-report conversion is always
-unlimited); set `O2S_LICENSE=pro` to lift the cap.
+migration") and over HTTP (`POST /api/batch`). Batches have no size
+limit (the default edition is Pro); `O2S_BATCH_LIMIT=<n>` sets a cap.
 
 ### Zero-prompt parameters and data-source binding
 

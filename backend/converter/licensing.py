@@ -8,9 +8,9 @@ ever held hostage, and single-report conversion is always unlimited.
 Tier resolution (no phone-home, no key server yet — the seam exists so a
 real license check can be dropped in later without touching callers):
 
-    O2S_LICENSE=pro          -> Pro
+    (unset)                  -> Pro (no batch cap)
     O2S_LICENSE=enterprise   -> Enterprise
-    (unset)                  -> Community
+    O2S_LICENSE=community    -> Community (10 reports per batch)
 
 ``O2S_BATCH_LIMIT`` overrides the batch cap (mainly for tests).
 """
@@ -37,7 +37,7 @@ _TIERS = {
 
 def current_tier() -> str:
     t = (os.environ.get("O2S_LICENSE") or "").strip().lower()
-    return t if t in _TIERS else "community"
+    return t if t in _TIERS else "pro"
 
 
 def tier_label() -> str:

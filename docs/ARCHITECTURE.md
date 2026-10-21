@@ -451,9 +451,9 @@ Extras card.
   the converter's own preflight and fidelity signals. When RenderLab is
   available, each RDL is also rendered through Microsoft's engine and the
   page-count / blank-page verdict is stamped into the assessment.
-* `licensing.py` — an edition seam (`O2S_LICENSE` → Community / Pro /
-  Enterprise) that gates only volume features (batch size) and assessment
-  branding. The converter core is fully functional in every edition and
+* `licensing.py` — an edition seam (`O2S_LICENSE` → Pro by default, or
+  Community / Enterprise) that gates only volume features (batch size) and
+  assessment branding. The converter core is fully functional in every edition and
   single-report conversion is always unlimited; there is no phone-home.
 
 ### 3.19 `backend/db/seed_sample_db.py` and `backend/db/sample.sqlite`

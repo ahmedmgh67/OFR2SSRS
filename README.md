@@ -394,3 +394,12 @@ including commercial use. Full text in [LICENSE](LICENSE).
 Optional paid tiers (Pro / Enterprise: unlimited batch, white-label
 Migration Assessments, support) remain available — open an issue or contact
 the author.
+
+### Third-party components
+
+The Windows wheels on PyPI (`*-win_amd64.whl`) also contain Microsoft's
+Report Viewer 2015 Runtime and System CLR Types for SQL Server 12 DLLs in
+`tools/renderlab/lib/`, so the Preview tab and batch rendering work offline.
+They are Copyright © Microsoft Corporation, licensed under Microsoft's terms
+(not MIT), and run on Windows only; see
+`tools/renderlab/lib/THIRD_PARTY_NOTICES.txt` in the installed package.

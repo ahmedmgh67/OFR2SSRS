@@ -1,7 +1,8 @@
 """Build a self-contained oracle2ssrs wheel for machines with no internet.
 
 Every runtime dependency is unpacked into oracle2ssrs/_vendor/ inside the
-wheel and the wheel declares no dependencies, so on the target machine
+wheel (and, for Windows, the ReportViewer DLLs into tools/renderlab/lib/)
+and the wheel declares no dependencies, so on the target machine
 
     pip install --no-index oracle2ssrs-<ver>-cp313-cp313-win_amd64.whl
 
@@ -98,6 +99,39 @@ def check_tree(vendor: Path, roots: list[str], env: dict) -> None:
     print(f"  dependency tree complete: {len({n for n, _ in seen})} packages")
 
 
+ENGINE_NOTICE = """\
+Third-party components in this folder
+=====================================
+
+The DLLs here are Microsoft redistributables, Copyright (c) Microsoft
+Corporation, downloaded unmodified from nuget.org by
+tools/renderlab/fetch_reportviewer.py:
+
+  Microsoft.ReportViewer.Runtime.WinForms 12.0.2402.15
+  Microsoft.ReportViewer.Runtime.Common   12.0.2402.15
+      (Microsoft Report Viewer 2015 Runtime)
+  Microsoft.SqlServer.Types               12.0.5000.0
+      (Microsoft System CLR Types for SQL Server; license in
+       licenses/license_SysClrTypes.rtf)
+
+They are licensed by Microsoft under Microsoft's terms, not under this
+project's MIT license, and may run on Windows only. By installing them you
+agree to those terms.
+"""
+
+
+def add_engine(lib: Path) -> None:
+    """Download the ReportViewer DLLs into the wheel tree."""
+    sys.path.insert(0, str(ROOT / "tools" / "renderlab"))
+    import fetch_reportviewer as fetch  # noqa: PLC0415
+    fetch.LIB = lib
+    if fetch.main() != 0:
+        sys.exit("Could not fetch the ReportViewer DLLs (see above).")
+    (lib / "THIRD_PARTY_NOTICES.txt").write_text(ENGINE_NOTICE, encoding="utf-8")
+    if not (lib / "licenses" / "license_SysClrTypes.rtf").exists():
+        sys.exit("Microsoft.SqlServer.Types license file missing from the package.")
+
+
 def run(*cmd: str) -> None:
     print("+", " ".join(cmd))
     subprocess.run(cmd, check=True)
@@ -108,6 +142,9 @@ def main() -> int:
     ap.add_argument("--platform", default="win_amd64")
     ap.add_argument("--python-version", default="3.13")
     ap.add_argument("--out", default=str(ROOT / "dist"))
+    ap.add_argument("--no-engine", action="store_true",
+                    help="leave out the ReportViewer DLLs (Windows wheels "
+                         "include them by default)")
     args = ap.parse_args()
 
     pyver = args.python_version
@@ -141,6 +178,11 @@ def main() -> int:
             print(f"  vendored {whl.name}")
 
         check_tree(vendor, deps + EXTRA, target_env(args.platform, pyver))
+
+        # The Preview/batch render engine is Windows-only and its license
+        # allows Windows only, so only Windows wheels carry it.
+        if args.platform.startswith("win") and not args.no_engine:
+            add_engine(tree / "oracle2ssrs" / "tools" / "renderlab" / "lib")
 
         # No Requires-Dist: pip must never try to fetch anything.
         info = next(tree.glob("*.dist-info"))
